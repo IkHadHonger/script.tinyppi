@@ -19,6 +19,7 @@
 <link rel="icon" href="/icon.png">
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/live-panels.css">
+<link rel="stylesheet" href="/css/jellyfin-sessions.css">
 <link rel="stylesheet" href="/css/dashboard.css">
 <link rel="stylesheet" href="/css/metadata.css">
 <link rel="stylesheet" href="/css/theme.css">
@@ -48,6 +49,14 @@
        carries. -->
   <section class="tabpanel" id="tab-live" data-tab="live" role="tabpanel"
            aria-labelledby="tabbtn-live">
+    <section class="jellyfin-board hidden" id="jellyfinBoard" aria-live="polite">
+      <header class="jellyfin-heading">
+        <div><span class="jellyfin-dot"></span><b>Jellyfin users</b></div>
+        <span class="mono" id="jellyfinCount"></span>
+      </header>
+      <div class="jellyfin-rail" id="jellyfinRail"></div>
+    </section>
+
     <div class="rail rail-main">
       <div id="live"></div>
 
@@ -319,6 +328,7 @@
 <script src="/js/core.js"></script>
 <script src="/js/cover-tint.js"></script>
 <script src="/js/live-panels.js"></script>
+<script src="/js/jellyfin-sessions.js"></script>
 <script src="/js/metadata.js"></script>
 <script src="/js/dashboard.js"></script>
 </body>

@@ -34,6 +34,7 @@ import xbmcvfs
 
 from core import settings
 from web import library
+from web.jellyfin import JellyfinBridge
 from web.snapshot import SnapshotBuilder, apply_command, apply_mode, art_path
 
 _ADDON_ID = "script.tinyppi"
@@ -376,6 +377,7 @@ def _static_routes() -> dict[str, tuple[str, str]]:
         "/metadata.html":         (os.path.join(web, "index.html"), html),
         "/css/base.css":          (os.path.join(web, "css", "base.css"), "text/css; charset=utf-8"),
         "/css/live-panels.css":   (os.path.join(web, "css", "live-panels.css"), "text/css; charset=utf-8"),
+        "/css/jellyfin-sessions.css": (os.path.join(web, "css", "jellyfin-sessions.css"), "text/css; charset=utf-8"),
         "/css/dashboard.css":     (os.path.join(web, "css", "dashboard.css"), "text/css; charset=utf-8"),
         "/css/metadata.css":      (os.path.join(web, "css", "metadata.css"), "text/css; charset=utf-8"),
         "/css/theme.css":         (os.path.join(web, "css", "theme.css"), "text/css; charset=utf-8"),
@@ -383,6 +385,7 @@ def _static_routes() -> dict[str, tuple[str, str]]:
         "/js/theme.js":           (os.path.join(web, "js", "theme.js"), "text/javascript; charset=utf-8"),
         "/js/cover-tint.js":      (os.path.join(web, "js", "cover-tint.js"), "text/javascript; charset=utf-8"),
         "/js/live-panels.js":     (os.path.join(web, "js", "live-panels.js"), "text/javascript; charset=utf-8"),
+        "/js/jellyfin-sessions.js": (os.path.join(web, "js", "jellyfin-sessions.js"), "text/javascript; charset=utf-8"),
         "/js/dashboard.js":       (os.path.join(web, "js", "dashboard.js"), "text/javascript; charset=utf-8"),
         "/js/metadata.js":        (os.path.join(web, "js", "metadata.js"), "text/javascript; charset=utf-8"),
         "/icons/chevron-down.svg": (os.path.join(web, "icons", "chevron-down.svg"), "image/svg+xml"),
@@ -892,7 +895,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if route in ("/api/state", "/api/stream", "/api/history", "/api/art",
                      "/api/library", "/api/series", "/api/episodes",
-                     "/api/continue"):
+                     "/api/continue", "/api/jellyfin", "/api/jellyfin/art"):
             if self.server.auth_read and not self._authorised():
                 self._send_error_json(HTTPStatus.UNAUTHORIZED, "token required")
                 return
@@ -906,6 +909,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._serve_episodes()
             elif route == "/api/continue":
                 self._serve_continue()
+            elif route == "/api/jellyfin":
+                self._send_json(self.server.jellyfin.sessions())
+            elif route == "/api/jellyfin/art":
+                self._serve_jellyfin_art()
             elif route == "/api/history":
                 # The chart's whole past and the event list, asked for on
                 # connect and again whenever the snapshot's event count moves.
@@ -1039,6 +1046,20 @@ class _Handler(BaseHTTPRequestHandler):
                                   "library unavailable")
             return
         self._send_listing(payload)
+
+    def _serve_jellyfin_art(self) -> None:
+        query = parse_qs(urlparse(self.path).query)
+        item_id = (query.get("item") or [""])[0].strip()
+        kind = (query.get("kind") or ["primary"])[0].strip().lower()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", item_id):
+            self._send_error_json(HTTPStatus.BAD_REQUEST, "bad item")
+            return
+        image = self.server.jellyfin.artwork(item_id, kind)
+        if image is None:
+            self._send_error_json(HTTPStatus.NOT_FOUND, "image unavailable")
+            return
+        body, content_type = image
+        self._send(HTTPStatus.OK, body, content_type, cache="private, max-age=30")
 
     def _start_film(self, payload: dict) -> None:
         """Put a film, or one episode of a series, on the television.
@@ -1359,6 +1380,7 @@ class _Server(ThreadingHTTPServer):
         self.token         = token
         self.static_routes = _static_routes()
         self.static_files  = _StaticFiles()
+        self.jellyfin      = JellyfinBridge()
         self.auth_read     = False
         self.allow_control = True
         self.offer_library = True
