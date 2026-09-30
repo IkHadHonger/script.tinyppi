@@ -10,6 +10,7 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 import xbmcvfs
+import xbmcaddon
 
 
 _CREDENTIALS = "special://profile/addon_data/plugin.video.jellyfin/data.json"
@@ -83,9 +84,7 @@ def _hdr_label(item: dict, video: dict) -> str:
     range_type = _text(video.get("VideoRangeType"))
     if video.get("DvProfile") is not None or "dovi" in range_type.lower():
         detail = _dv_detail(item, video)
-        compatibility = video.get("DvBlSignalCompatibilityId")
-        compat = " (HDR10+)" if compatibility == 1 else ""
-        return ("Dolby Vision " + detail + compat).strip()
+        return ("Dolby Vision " + detail).strip()
     if range_type.lower() == "hdr10plus":
         return "HDR10+"
     if range_type.lower() == "hdr10":
@@ -103,6 +102,8 @@ class JellyfinBridge:
         self._sessions_at = 0.0
         self._sessions = {"available": False, "sessions": []}
         self._items = {}
+        self._local_at = 0.0
+        self._local = {}
 
     @staticmethod
     def _connection() -> dict:
@@ -127,19 +128,89 @@ class JellyfinBridge:
 
     @staticmethod
     def _request(connection: dict, path: str, binary: bool = False):
+        # Match the authenticated header used by Jellyfin for Kodi. Include
+        # Token in Authorization rather than a tokenless authorization header
+        # alongside a separate token header (some servers prioritize the former).
+        authorization = (
+            'MediaBrowser Client="TinyPPI", Device="CoreELEC", '
+            'DeviceId="tinyppi-dashboard", Version="2.13.2", Token="{}"'
+        ).format(quote(connection["token"], safe=""))
         request = Request(connection["address"] + path, headers={
             "Accept": "image/*" if binary else "application/json",
-            "X-Emby-Token": connection["token"],
-            "X-Emby-Authorization": (
-                'MediaBrowser Client="TinyPPI", Device="CoreELEC", '
-                'DeviceId="tinyppi-dashboard", Version="1"'
-            ),
+            "Authorization": authorization,
         })
         with urlopen(request, timeout=_TIMEOUT) as response:
             body = response.read()
             if binary:
                 return body, response.headers.get_content_type()
             return json.loads(body.decode("utf-8"))
+
+    @staticmethod
+    def _failure(exc) -> dict:
+        # Never return exception text: it can contain URLs or credentials.
+        if isinstance(exc, HTTPError):
+            return {"reason": "jellyfin_http_error", "http_status": exc.code}
+        if isinstance(exc, (URLError, OSError)):
+            return {"reason": "jellyfin_connection_failed"}
+        return {"reason": "jellyfin_invalid_response"}
+
+    def local_user(self) -> dict:
+        """Identity of this Kodi box, never an arbitrary active server user.
+
+        Prefer the session with this installation's jellyfin_guid. If remote
+        session access fails, the name saved by Jellyfin for Kodi is still a
+        useful, explicitly labelled configured-user fallback.
+        """
+        now = time.monotonic()
+        with self._lock:
+            if now - self._local_at < 10.0:
+                return dict(self._local)
+            connection = self._connection()
+            if not connection:
+                result = {"available": False, "user": "",
+                          "reason": "jellyfin_for_kodi_not_configured"}
+            else:
+                try:
+                    addon = xbmcaddon.Addon("plugin.video.jellyfin")
+                    username = addon.getSetting("username").strip()
+                except Exception:
+                    username = ""
+                try:
+                    guid_path = xbmcvfs.translatePath(
+                        "special://profile/addon_data/plugin.video.jellyfin/jellyfin_guid"
+                    )
+                    with open(guid_path, "r", encoding="utf-8") as handle:
+                        device_id = handle.read().strip()
+                except OSError:
+                    device_id = ""
+                result = {"available": True, "user": username,
+                          "source": "configured", "linked": False}
+                try:
+                    if device_id:
+                        raw = self._request(connection, "/Sessions?" +
+                                            urlencode({"DeviceId": device_id}))
+                        if not isinstance(raw, list):
+                            raise ValueError("invalid sessions")
+                        matches = [session for session in raw
+                                   if session.get("DeviceId") == device_id
+                                   and (not connection.get("user_id") or
+                                        session.get("UserId") == connection["user_id"])
+                                   and session.get("UserName")]
+                        playing = [session for session in matches
+                                   if session.get("NowPlayingItem")]
+                        match = (playing or matches or [None])[0]
+                        if match:
+                            result.update(user=match["UserName"], source="session",
+                                          linked=True)
+                    if not result["linked"]:
+                        user = self._request(connection, "/Users/Me")
+                        if isinstance(user, dict) and user.get("Name"):
+                            result.update(user=user["Name"], source="account", linked=True)
+                except (HTTPError, URLError, OSError, ValueError, TypeError) as exc:
+                    result.update(self._failure(exc))
+            self._local_at = time.monotonic()
+            self._local = result
+            return dict(result)
 
     def _item(self, connection: dict, item: dict) -> dict:
         item_id = _text(item.get("Id"))
@@ -183,9 +254,9 @@ class JellyfinBridge:
                     ))
                     result = {"available": True, "server": connection.get("name", ""),
                               "sessions": active}
-                except (HTTPError, URLError, OSError, ValueError, TypeError):
+                except (HTTPError, URLError, OSError, ValueError, TypeError) as exc:
                     result = {"available": True, "sessions": [],
-                              "reason": "jellyfin_unavailable"}
+                              **self._failure(exc)}
             self._sessions_at = now
             self._sessions = result
             return result

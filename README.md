@@ -4,12 +4,14 @@
 
 A CoreELEC addon that displays detailed playback information in a custom overlay window during video playback. It provides real-time data on video, audio, HDR, system resources, and more — with special support for **Amlogic** hardware (e.g. CoreELEC devices).
 
-This fork also adds active Jellyfin users to the web dashboard. TinyPPI reuses
-the existing Jellyfin for Kodi connection on the same Kodi profile and shows
-one full session card per active user in a horizontally scrollable row. Each
-card includes artwork, playback progress, client and device, video/HDR details,
-audio, subtitles and transcoding information. The Jellyfin access token stays
-on the CoreELEC device and is never sent to the dashboard browser.
+This fork adds the local Jellyfin user to the original TinyPPI playback card.
+TinyPPI reuses the existing Jellyfin for Kodi connection and matches the local
+device ID to its Jellyfin session. If the server is temporarily unavailable,
+it can display the account configured in Jellyfin for Kodi; Settings explains
+whether the account was verified or read from the saved configuration. All
+existing TinyPPI controls and local measurements are retained. The Jellyfin
+access token stays on CoreELEC and is never sent to the browser. Collecting
+full TinyPPI measurements from other CoreELEC devices is not implemented yet.
 
 ---
 

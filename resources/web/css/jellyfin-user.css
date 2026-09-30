@@ -1,0 +1,8 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+.jellyfin-user {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  padding-right: calc(var(--toggle-inset) + var(--toggle-size));
+}

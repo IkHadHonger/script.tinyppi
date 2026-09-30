@@ -377,7 +377,7 @@ def _static_routes() -> dict[str, tuple[str, str]]:
         "/metadata.html":         (os.path.join(web, "index.html"), html),
         "/css/base.css":          (os.path.join(web, "css", "base.css"), "text/css; charset=utf-8"),
         "/css/live-panels.css":   (os.path.join(web, "css", "live-panels.css"), "text/css; charset=utf-8"),
-        "/css/jellyfin-sessions.css": (os.path.join(web, "css", "jellyfin-sessions.css"), "text/css; charset=utf-8"),
+        "/css/jellyfin-user.css": (os.path.join(web, "css", "jellyfin-user.css"), "text/css; charset=utf-8"),
         "/css/dashboard.css":     (os.path.join(web, "css", "dashboard.css"), "text/css; charset=utf-8"),
         "/css/metadata.css":      (os.path.join(web, "css", "metadata.css"), "text/css; charset=utf-8"),
         "/css/theme.css":         (os.path.join(web, "css", "theme.css"), "text/css; charset=utf-8"),
@@ -385,7 +385,7 @@ def _static_routes() -> dict[str, tuple[str, str]]:
         "/js/theme.js":           (os.path.join(web, "js", "theme.js"), "text/javascript; charset=utf-8"),
         "/js/cover-tint.js":      (os.path.join(web, "js", "cover-tint.js"), "text/javascript; charset=utf-8"),
         "/js/live-panels.js":     (os.path.join(web, "js", "live-panels.js"), "text/javascript; charset=utf-8"),
-        "/js/jellyfin-sessions.js": (os.path.join(web, "js", "jellyfin-sessions.js"), "text/javascript; charset=utf-8"),
+        "/js/jellyfin-user.js": (os.path.join(web, "js", "jellyfin-user.js"), "text/javascript; charset=utf-8"),
         "/js/dashboard.js":       (os.path.join(web, "js", "dashboard.js"), "text/javascript; charset=utf-8"),
         "/js/metadata.js":        (os.path.join(web, "js", "metadata.js"), "text/javascript; charset=utf-8"),
         "/icons/chevron-down.svg": (os.path.join(web, "icons", "chevron-down.svg"), "image/svg+xml"),
@@ -895,7 +895,8 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if route in ("/api/state", "/api/stream", "/api/history", "/api/art",
                      "/api/library", "/api/series", "/api/episodes",
-                     "/api/continue", "/api/jellyfin", "/api/jellyfin/art"):
+                     "/api/continue", "/api/jellyfin", "/api/jellyfin/art",
+                     "/api/jellyfin/local"):
             if self.server.auth_read and not self._authorised():
                 self._send_error_json(HTTPStatus.UNAUTHORIZED, "token required")
                 return
@@ -911,6 +912,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._serve_continue()
             elif route == "/api/jellyfin":
                 self._send_json(self.server.jellyfin.sessions())
+            elif route == "/api/jellyfin/local":
+                self._send_json(self.server.jellyfin.local_user())
             elif route == "/api/jellyfin/art":
                 self._serve_jellyfin_art()
             elif route == "/api/history":
