@@ -1,0 +1,48 @@
+name: Safely sync TinyPPI upstream
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/sync-upstream.yml', 'tools/sync_upstream.py']
+permissions:
+  contents: write
+concurrency:
+  group: tinyppi-upstream
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Configure merge identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Merge upstream, preserving fork features
+        run: python tools/sync_upstream.py
+      - name: Test before publishing
+        run: |
+          python -m unittest discover -s tests
+          python -m compileall -q main.py resources/lib
+          node tests/test_multi_user.js
+          for file in resources/web/js/*.js; do node --check "$file"; done
+          git diff --check
+          git diff --cached --check
+      - name: Commit and push only a tested merge
+        run: |
+          if test -f .git/MERGE_HEAD; then
+            git commit -m 'Synchronize TinyPPI upstream with Jellyfin customizations preserved'
+            git push origin HEAD:main
+          fi
