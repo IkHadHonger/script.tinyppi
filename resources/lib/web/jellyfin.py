@@ -133,7 +133,7 @@ class JellyfinBridge:
         # alongside a separate token header (some servers prioritize the former).
         authorization = (
             'MediaBrowser Client="TinyPPI", Device="CoreELEC", '
-            'DeviceId="tinyppi-dashboard", Version="2.13.2", Token="{}"'
+            'DeviceId="tinyppi-dashboard", Version="2.13.3", Token="{}"'
         ).format(quote(connection["token"], safe=""))
         request = Request(connection["address"] + path, headers={
             "Accept": "image/*" if binary else "application/json",

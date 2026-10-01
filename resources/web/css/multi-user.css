@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+.user-dashboards, .user-dashboards-summary { display: none; }
+.tinyppi-multi #tab-live > :not(.user-dashboards):not(.user-dashboards-summary) { display: none !important; }
+.tinyppi-multi .user-dashboards-summary { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.tinyppi-multi .user-dashboards {
+  display: flex; align-items: flex-start; gap: 18px; overflow-x: auto;
+  scroll-snap-type: x proximity; padding-bottom: 18px;
+}
+.user-dashboard {
+  flex: 0 0 min(560px, 100%); width: min(560px, 100%); height: 1000px;
+  border: 0; border-radius: 20px; scroll-snap-align: start; background: var(--bg);
+}
+.user-dashboard.box-idle { position: absolute; width: 1px; height: 1px !important; opacity: 0; pointer-events: none; }
+.tinyppi-embedded .topbar, .tinyppi-embedded .tabbar { display: none !important; }
+.tinyppi-embedded main { padding: 8px !important; margin: 0 !important; max-width: none; }
+.tinyppi-embedded body { min-height: 0 !important; height: auto !important; display: block !important; }
+.tinyppi-embedded main, .tinyppi-embedded #tab-live { flex: none !important; min-height: 0 !important; justify-content: flex-start !important; }
+.tinyppi-embedded .groups { grid-template-columns: 1fr; }
+.tinyppi-embedded .tabpanel { padding-bottom: 0 !important; }
+#dashboardBoxes { width: 100%; min-height: 85px; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }

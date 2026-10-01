@@ -21,7 +21,8 @@
 
   function render(identity) {
     const user = identity.user || "";
-    label.textContent = user ? "Jellyfin · " + user : "";
+    document.dispatchEvent(new CustomEvent('tinyppi-user', {detail: user}));
+    label.textContent = user;
     label.classList.toggle("hidden", !user);
     label.title = identity.source === "configured"
       ? "Account configured in Jellyfin for Kodi"
@@ -45,6 +46,7 @@
     try {
       render(await TinyPPI.getJSON("/api/jellyfin/local"));
     } catch (_) {
+      document.dispatchEvent(new CustomEvent('tinyppi-user', {detail: ''}));
       // Do not leave a stale user attached after the identity endpoint fails.
       label.textContent = "";
       label.classList.add("hidden");

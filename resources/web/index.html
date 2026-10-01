@@ -23,6 +23,7 @@
 <link rel="stylesheet" href="/css/dashboard.css">
 <link rel="stylesheet" href="/css/metadata.css">
 <link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/multi-user.css">
 </head>
 
 <body class="dashboard-page">
@@ -259,6 +260,16 @@
     </section>
 
     <section class="card setcard">
+      <h2 class="sethead">Jellyfin users · other TinyPPI boxes</h2>
+      <div class="setbody">
+        <label for="dashboardBoxes">Dashboard addresses, one per line (this box is included automatically)</label>
+        <textarea id="dashboardBoxes" placeholder="http://192.168.1.100:8099" spellcheck="false"></textarea>
+        <button class="setbtn" id="dashboardBoxesSave" type="button">Save boxes</button>
+        <p id="dashboardBoxesStatus" role="status">Use trusted local or tailnet boxes only. Connections go directly from this browser; each box keeps its own access token and controls. Both boxes need TinyPPI 2.13.3 or newer.</p>
+      </div>
+    </section>
+
+    <section class="card setcard">
       <h2 class="sethead" id="reportHead"></h2>
       <div class="setbody setbtns">
         <button class="setbtn" id="copyBtn" type="button" disabled>
@@ -328,5 +339,6 @@
 <script src="/js/jellyfin-user.js"></script>
 <script src="/js/metadata.js"></script>
 <script src="/js/dashboard.js"></script>
+<script src="/js/multi-user.js"></script>
 </body>
 </html>
