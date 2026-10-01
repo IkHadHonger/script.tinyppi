@@ -1,5 +1,14 @@
 const assert = require('node:assert/strict');
-const {origins, isMainDashboard} = require('../resources/web/js/multi-user.js');
+const {origins, isMainDashboard, activeBox, needsRetry} = require('../resources/web/js/multi-user.js');
+const now = 100000;
+const active = {playing:true, connected:true, updated:99000, attempted:70000};
+assert.equal(activeBox(active, now), true);
+for (const change of [{playing:false}, {playing:null}, {connected:false}, {updated:88000}]) {
+  assert.equal(activeBox({...active, ...change}, now), false);
+}
+assert.equal(needsRetry(active, now), false);
+assert.equal(needsRetry({...active, updated:0}, now), true);
+assert.equal(needsRetry({...active, updated:0, attempted:99000}, now), false);
 assert.equal(isMainDashboard({main_dashboard:true}), true);
 for (const hello of [null, {}, {main_dashboard:false}, {main_dashboard:'true'}]) {
   assert.equal(isMainDashboard(hello), false);

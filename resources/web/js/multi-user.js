@@ -18,7 +18,13 @@
     return result;
   }
   function isMainDashboard(hello) { return !!hello && hello.main_dashboard === true; }
-  if (typeof module !== 'undefined') { module.exports = { origins, isMainDashboard }; return; }
+  function activeBox(box, now) {
+    return box.playing === true && box.connected === true && now - box.updated < 12000;
+  }
+  function needsRetry(box, now) {
+    return now - box.updated >= 12000 && now - box.attempted >= 30000;
+  }
+  if (typeof module !== 'undefined') { module.exports = { origins, isMainDashboard, activeBox, needsRetry }; return; }
   const embedded = new URLSearchParams(location.search).get('embedded') === '1';
   const panel = document.getElementById('tab-live');
   if (!panel) return;
@@ -79,10 +85,16 @@
   panel.append(summary, row);
   let boxes = [];
   function describe() {
-    summary.textContent = boxes.map((box) => (box.user || box.label) + ' · ' +
-      (Date.now() - box.updated > 12000 ? 'Offline / connecting' :
-        box.connected === false ? 'Disconnected' :
-        box.playing === true ? 'Playing' : box.playing === false ? 'Idle' : 'Connecting')).join('   |   ');
+    const now = Date.now();
+    const active = boxes.filter((box) => activeBox(box, now));
+    for (const box of boxes) {
+      const visible = active.includes(box);
+      box.frame.classList.toggle('box-idle', !visible);
+      box.frame.inert = !visible;
+      box.frame.setAttribute('aria-hidden', String(!visible));
+    }
+    row.classList.toggle('single-user', active.length === 1);
+    summary.textContent = active.length ? '' : 'Geen actieve gebruikers';
   }
   function configure(text) {
     const addresses = mainDashboard ? origins(text, location.origin) : [];
@@ -105,9 +117,11 @@
       frame.title = 'TinyPPI · ' + new URL(address).hostname;
       frame.src = address + '/?embedded=1#live';
       frame.referrerPolicy = 'strict-origin-when-cross-origin';
-      frame.className = 'user-dashboard';
+      frame.className = 'user-dashboard box-idle';
+      frame.inert = true;
+      frame.setAttribute('aria-hidden', 'true');
       const box = {frame, origin: address, label: new URL(address).hostname,
-        updated: 0, playing: null, user: ''};
+        updated: 0, attempted: Date.now(), playing: null, user: ''};
       boxes.push(box);
       row.append(frame);
     }
@@ -126,7 +140,6 @@
       box.frame.style.height = Math.min(12000, Math.max(400, event.data.height)) + 'px';
     }
     // Keep idle players reachable, but only active users occupy the live row.
-    box.frame.classList.toggle('box-idle', box.playing === false);
     box.frame.title = 'TinyPPI · ' + (box.user || box.label);
     describe();
   });
@@ -153,5 +166,14 @@
       note.textContent = 'Saved on this browser. Open Live to see active users. Each box needs TinyPPI 2.13.3 or newer.';
     } catch (error) { note.textContent = error.message; }
   });
-  setInterval(describe, 4000);
+  setInterval(() => {
+    describe();
+    const now = Date.now();
+    for (const box of boxes) {
+      if (needsRetry(box, now)) {
+        box.attempted = now;
+        box.frame.src = box.origin + '/?embedded=1#live';
+      }
+    }
+  }, 4000);
 })();
