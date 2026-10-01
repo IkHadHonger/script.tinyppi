@@ -542,6 +542,12 @@ _ART_LABELS = {
 
 def art_path(kind: str) -> str:
     """The raw path Kodi holds for a kind of artwork, or ''."""
+    if kind == "poster" and _pvr_live():
+        # The channel's cover is often just its logo. Prefer the artwork of
+        # the currently airing programme; never the focused/next guide item.
+        programme = info("PVR.EpgEventIcon").strip()
+        if programme:
+            return programme
     for label in _ART_LABELS.get(kind, ()):
         path = info(label).strip()
         if path:
