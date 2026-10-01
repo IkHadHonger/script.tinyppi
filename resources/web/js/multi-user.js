@@ -24,26 +24,43 @@
   if (!panel) return;
   if (embedded) {
     document.documentElement.classList.add('tinyppi-embedded');
+    const main = document.querySelector('main');
+    const navigation = document.getElementById('tabBar');
+    main.before(navigation);
+    const userHeading = document.createElement('b');
+    userHeading.className = 'embedded-user';
+    document.querySelector('.topbar').prepend(userHeading);
+    const tokenButton = document.createElement('button');
+    tokenButton.type = 'button';
+    tokenButton.className = 'setbtn';
+    tokenButton.textContent = 'Token';
+    tokenButton.title = 'Token voor deze box invoeren';
+    tokenButton.addEventListener('click', () => TinyPPI.askToken());
+    navigation.append(tokenButton);
     let target;
-    try { target = new URL(document.referrer).origin; } catch (_) { return; }
+    try { target = new URL(document.referrer).origin; } catch (_) { target = null; }
     let playing = null;
     let user = '';
     function report() {
+      user = document.querySelector('.jellyfin-user')?.textContent || user;
+      userHeading.textContent = user;
       if (playing === null) {
         const idle = document.getElementById('idleCard');
         if (idle && !idle.classList.contains('hidden')) playing = false;
         else if (document.getElementById('title').textContent !== '—') playing = true;
       }
-      parent.postMessage({type: 'tinyppi-box', playing, user,
+      if (target) parent.postMessage({type: 'tinyppi-box', playing, user,
         connected: document.getElementById('status').dataset.state === 'live',
-        height: Math.ceil(panel.getBoundingClientRect().height) + 24,
+        height: Math.ceil(main.getBoundingClientRect().height +
+          navigation.getBoundingClientRect().height +
+          document.querySelector('.topbar').getBoundingClientRect().height) + 24,
         version: document.getElementById('version').textContent}, target);
     }
     document.addEventListener('tinyppi-state', (event) => {
       playing = !!event.detail.playing;
     });
     document.addEventListener('tinyppi-user', (event) => { user = event.detail || ''; });
-    new ResizeObserver(report).observe(panel);
+    new ResizeObserver(report).observe(main);
     setInterval(report, 2000);
     report();
     return;

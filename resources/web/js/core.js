@@ -136,6 +136,14 @@ window.TinyPPI = (function () {
   let source = null;
   let retryAt = 1000;
   let retryTimer = 0;
+  // Open frames must pick up token changes made on this same box in another tab.
+  // Browser-partitioned frames can still enter their token using their own button.
+  window.addEventListener('storage', (event) => {
+    if (event.key !== TOKEN_KEY || event.storageArea !== localStorage) return;
+    token = event.newValue || '';
+    document.dispatchEvent(new CustomEvent('tinyppi-token'));
+    connect();
+  });
   /* The last whole snapshot.  Everything after the first frame of a
      connection arrives as a delta measured against it (see _snapshot_delta in
      web/server.py), so it is what those are applied to. */
@@ -437,7 +445,7 @@ window.TinyPPI = (function () {
         /* A first visit to a page that wants a token has not got one wrong;
            it has not been given one yet. */
         if (token) toast(T.token_bad, true);
-        askToken();
+        if (new URLSearchParams(location.search).get('embedded') !== '1') askToken();
         return;
       }
       return response.json().then((state) => {
@@ -565,7 +573,8 @@ window.TinyPPI = (function () {
       Object.assign(T, hello.strings || {});
       applyChromeStrings();
       if (options.onStrings) options.onStrings(T, hello);
-      if (hello.auth_read && !token) askToken();
+      if (hello.auth_read && !token &&
+          new URLSearchParams(location.search).get('embedded') !== '1') askToken();
     } catch (_) { /* the stream's own retry will report the outage */ }
   }
 

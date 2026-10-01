@@ -10,6 +10,12 @@ From 2.13.4 the other-box settings are shown only on the designated main box.
 In the Kodi add-on settings under Dashboard, enable **Hoofddashboard** on your
 central box only (Cube 3). Leave it disabled on participant boxes (AM6B+).
 This role is stored on the box, not inferred from the logged-in Jellyfin user.
+From 2.13.5 every user column has its own Live / Dolby Vision navigation and
+Token button. Its Dolby Vision page retains the original L1 luminance chart,
+L5 active area and full RPU metadata. Availability follows that box's playback,
+not the main box's dynamic range. Enter a participant token directly in its
+column if the browser isolates embedded storage from standalone tabs. Existing
+same-origin frames also refresh their token when it changes in another tab.
 Disabled participant dashboards ignore even previously saved browser box lists.
 The main dashboard provides separate links to each box's token entry page;
 tokens remain isolated to the corresponding dashboard origin.
