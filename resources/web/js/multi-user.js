@@ -95,9 +95,16 @@
     }
     row.classList.toggle('single-user', active.length === 1);
     summary.textContent = active.length ? '' : 'Geen actieve gebruikers';
+    if (boxes.length) {
+      const connected = boxes.some((box) => box.connected === true && now - box.updated < 12000);
+      TinyPPI.setStatus(connected ? 'live' : 'wait', connected ? TinyPPI.T.connected : TinyPPI.T.connecting);
+    }
   }
   function configure(text) {
     const addresses = mainDashboard ? origins(text, location.origin) : [];
+    // In multi-box mode the own embedded card already owns the local stream.
+    // The outer dashboard must not consume a second server slot.
+    TinyPPI.setStreamEnabled(addresses.length === 0);
     tokens.replaceChildren();
     for (const address of addresses) {
       const link = document.createElement('a');

@@ -7,7 +7,7 @@ import zlib
 source = Path(__file__).resolve().parents[1] / 'resources/lib/web/snapshot.py'
 tree = ast.parse(source.read_text(encoding='utf-8'))
 selected = [node for node in tree.body if
-            isinstance(node, ast.FunctionDef) and node.name in ('art_path', '_art_tags') or
+            isinstance(node, ast.FunctionDef) and node.name in ('art_path', '_art_tags', '_is_live_tv') or
             isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '_ART_LABELS' for t in node.targets)]
 compiled = compile(ast.Module(body=selected, type_ignores=[]), str(source), 'exec')
 
@@ -17,7 +17,7 @@ class LiveArtTests(unittest.TestCase):
         self.labels = {'Player.Art(poster)': 'channel-logo', 'PVR.EpgEventIcon': 'programme-poster'}
         self.live = True
         self.scope = {'info': lambda key: self.labels.get(key, ''),
-                      '_pvr_live': lambda: self.live, 'zlib': zlib}
+                      'cond': lambda key: self.live and key == 'PVR.IsPlayingTV', 'zlib': zlib}
         exec(compiled, self.scope)
 
     def test_programme_art_beats_channel_logo(self):

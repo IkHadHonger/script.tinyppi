@@ -136,6 +136,7 @@ window.TinyPPI = (function () {
   let source = null;
   let retryAt = 1000;
   let retryTimer = 0;
+  let streamEnabled = true;
   // Open frames must pick up token changes made on this same box in another tab.
   // Browser-partitioned frames can still enter their token using their own button.
   window.addEventListener('storage', (event) => {
@@ -295,7 +296,7 @@ window.TinyPPI = (function () {
     stopRetry();
     /* Nothing is retried out of sight; coming back into it reconnects at once
        (see the visibility handler below). */
-    if (document.hidden) return;
+    if (document.hidden || !streamEnabled) return;
     retryTimer = setTimeout(connect, delay);
   }
 
@@ -312,6 +313,14 @@ window.TinyPPI = (function () {
     stopRetry();
     if (source) { source.close(); source = null; }
     base = null;
+  }
+
+  function setStreamEnabled(enabled) {
+    enabled = !!enabled;
+    if (streamEnabled === enabled) return;
+    streamEnabled = enabled;
+    if (enabled) connect();
+    else disconnect();
   }
 
   function frame(event) {
@@ -385,7 +394,7 @@ window.TinyPPI = (function () {
 
   function connect() {
     disconnect();
-    if (document.hidden) return;
+    if (document.hidden || !streamEnabled) return;
     setStatus("wait", T.connecting);
     source = new EventSource(withToken("/api/stream"));
 
@@ -609,7 +618,7 @@ window.TinyPPI = (function () {
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
     copyReport, reportLine, command, getJSON, withToken,
-    disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure,
+    disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled,
     get token() { return token; }
   };
 
