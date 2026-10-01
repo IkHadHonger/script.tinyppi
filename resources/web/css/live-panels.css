@@ -421,6 +421,7 @@
 
 .hero {
   position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
@@ -447,6 +448,20 @@
      bought back is nothing the row needs. */
   --toggle-inset: 18px;
   --toggle-size: 34px;
+}
+/* A separate layer preserves the existing theme/tint fallback. Keep the
+   brightest possible fanart dark enough for the title, readings and controls. */
+.hero.has-fanart::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: linear-gradient(90deg, rgba(8, 11, 16, .88), rgba(8, 11, 16, .72)), var(--hero-fanart);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 /* The bar, the buttons and the pickers span every column: what is left of the
    middle column once a poster stands beside it is no width to lay a remote

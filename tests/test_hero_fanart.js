@@ -1,0 +1,31 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const pictures = [];
+const properties = new Map(), classes = new Set();
+const card = {style: {setProperty: (k,v) => properties.set(k,v), removeProperty: k => properties.delete(k)},
+  classList: {add: k => classes.add(k), remove: k => classes.delete(k)}};
+const context = {window: {}, TinyPPI: {withToken: url => url + '&token=example'},
+  Image: class {constructor() {this.naturalWidth = 1920; pictures.push(this);}}};
+vm.runInNewContext(fs.readFileSync('resources/web/js/hero-fanart.js', 'utf8'), context);
+const show = context.window.TinyPPIHeroFanart.show;
+show(card, 'first');
+assert.equal(classes.has('has-fanart'), false);
+pictures[0].onload();
+assert.equal(classes.has('has-fanart'), true);
+assert.match(properties.get('--hero-fanart'), /kind=fanart/);
+show(card, 'first');
+assert.equal(pictures.length, 1, 'Unchanged art is fetched only once');
+show(card, 'second');
+assert.equal(classes.has('has-fanart'), false, 'Old title must disappear immediately');
+pictures[0].onload();
+assert.equal(classes.has('has-fanart'), false, 'Late loads cannot restore old art');
+pictures[1].onload();
+assert.equal(classes.has('has-fanart'), true);
+show(card, '');
+assert.equal(properties.size, 0);
+pictures[1].onload();
+assert.equal(classes.has('has-fanart'), false, 'Idle cannot restore pending art');
+show(card, 'missing');
+assert.equal(classes.has('has-fanart'), false, 'Failed loads leave the tint fallback');
+console.log('Hero fanart: all tests passed.');

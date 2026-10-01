@@ -253,6 +253,7 @@
      ignores it, so the call is made whichever one is in force -- the theme can
      change long after the film did (see js/cover-tint.js). */
   function renderArt(art) {
+    if (window.TinyPPIHeroFanart) TinyPPIHeroFanart.show(el.nowCard, art.fanart);
     const tag = art.poster || "";
     if (tag === posterTag) return;
     posterTag = tag;
@@ -1229,6 +1230,7 @@
         for (const node of cards) node.classList.add("hidden");
         live = [];
         posterTag = "";
+        if (window.TinyPPIHeroFanart) TinyPPIHeroFanart.show(el.nowCard, "");
         trackKey = "";
         renderFinish("");
         fpsShown = null;
