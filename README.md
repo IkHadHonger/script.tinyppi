@@ -6,6 +6,13 @@ A CoreELEC addon that displays detailed playback information in a custom overlay
 
 This fork adds the local Jellyfin user to the original TinyPPI playback card.
 Version 2.13.3 also combines trusted TinyPPI boxes into one horizontal live row.
+From 2.13.4 the other-box settings are shown only on the designated main box.
+In the Kodi add-on settings under Dashboard, enable **Hoofddashboard** on your
+central box only (Cube 3). Leave it disabled on participant boxes (AM6B+).
+This role is stored on the box, not inferred from the logged-in Jellyfin user.
+Disabled participant dashboards ignore even previously saved browser box lists.
+The main dashboard provides separate links to each box's token entry page;
+tokens remain isolated to the corresponding dashboard origin.
 Update every participating box to 2.13.3 or newer. On the main dashboard open
 Settings → Jellyfin users · other TinyPPI boxes, enter the other dashboard
 addresses (one per line), and press Save boxes. The current box is included

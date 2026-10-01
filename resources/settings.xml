@@ -6526,6 +6526,11 @@
                     <default>false</default>
                     <control type="toggle" />
                 </setting>
+                <setting id="web_main_dashboard" type="boolean" label="Hoofddashboard (andere TinyPPI-boxen beheren)" help="Alleen inschakelen op je centrale dashboardbox. Andere boxen blijven hun eigen gebruiker en bediening tonen.">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
                 <setting id="web_port" type="integer" label="32434" help="32435">
                     <level>0</level>
                     <default>8099</default>

@@ -259,12 +259,13 @@
       <div class="setbody"><p id="jellyfinLinkStatus">Checking connection…</p></div>
     </section>
 
-    <section class="card setcard">
-      <h2 class="sethead">Jellyfin users · other TinyPPI boxes</h2>
+    <section class="card setcard hidden" id="dashboardBoxesCard">
+      <h2 class="sethead">Gebruikers · andere TinyPPI-boxen</h2>
       <div class="setbody">
         <label for="dashboardBoxes">Dashboard addresses, one per line (this box is included automatically)</label>
         <textarea id="dashboardBoxes" placeholder="http://192.168.1.100:8099" spellcheck="false"></textarea>
         <button class="setbtn" id="dashboardBoxesSave" type="button">Save boxes</button>
+        <div id="dashboardBoxTokens"></div>
         <p id="dashboardBoxesStatus" role="status">Use trusted local or tailnet boxes only. Connections go directly from this browser; each box keeps its own access token and controls. Both boxes need TinyPPI 2.13.3 or newer.</p>
       </div>
     </section>

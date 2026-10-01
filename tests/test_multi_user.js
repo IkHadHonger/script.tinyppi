@@ -1,5 +1,9 @@
 const assert = require('node:assert/strict');
-const {origins} = require('../resources/web/js/multi-user.js');
+const {origins, isMainDashboard} = require('../resources/web/js/multi-user.js');
+assert.equal(isMainDashboard({main_dashboard:true}), true);
+for (const hello of [null, {}, {main_dashboard:false}, {main_dashboard:'true'}]) {
+  assert.equal(isMainDashboard(hello), false);
+}
 assert.deepEqual(origins('http://192.168.1.100:8099\nhttp://192.168.1.100:8099/', 'http://192.168.1.15:8099'), ['http://192.168.1.100:8099']);
 assert.deepEqual(origins('http://192.168.1.15:8099', 'http://192.168.1.15:8099'), []);
 assert.deepEqual(origins('', 'http://192.168.1.15:8099'), []);

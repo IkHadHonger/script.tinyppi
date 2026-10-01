@@ -936,6 +936,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "version":     addon.getAddonInfo("version"),
                 "auth_read":   self.server.auth_read,
                 "control":     self.server.allow_control,
+                "main_dashboard": addon.getSetting("web_main_dashboard") == "true",
                 # Whether the idle page has a film library to offer.  Both
                 # halves have to be there: reading the library is this
                 # setting, and starting one of them is the control setting.
