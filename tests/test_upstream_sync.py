@@ -23,8 +23,11 @@ class SyncTests(unittest.TestCase):
 
     def test_fork_integration_remains_wired(self):
         server = (ROOT / 'resources/lib/web/server.py').read_text(encoding='utf-8')
-        for marker in ['JellyfinBridge', '/api/jellyfin/local', 'web_main_dashboard', '/js/multi-user.js']:
-            self.assertIn(marker, server)
+        self.assertIn('JellyfinBridge', server)
+        routes = (ROOT / 'resources/lib/web/routes.py').read_text(encoding='utf-8')
+        for marker in ['/api/jellyfin/local', 'web_main_dashboard']:
+            self.assertIn(marker, routes)
+        self.assertIn('/js/multi-user.js', (ROOT / 'resources/web/index.html').read_text(encoding='utf-8'))
         core = (ROOT / 'resources/web/js/core.js').read_text(encoding='utf-8')
         self.assertIn('tinyppi.token', core)
         layout = (ROOT / 'resources/web/css/multi-user.css').read_text(encoding='utf-8')

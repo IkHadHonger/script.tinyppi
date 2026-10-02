@@ -152,9 +152,11 @@
   });
   async function initialiseRole() {
     try {
-      mainDashboard = isMainDashboard(await TinyPPI.getJSON('/api/hello'));
+      const hello = await TinyPPI.getJSON('/api/hello');
+      mainDashboard = isMainDashboard(hello);
       settingsCard.classList.toggle('hidden', !mainDashboard);
-      input.value = localStorage.getItem(storageKey) || '';
+      const fallback = (hello.dashboard_trust || []).join('\n');
+      try { input.value = localStorage.getItem(storageKey) || fallback; } catch (_) { input.value = fallback; }
       configure(input.value);
     } catch (error) {
       mainDashboard = false;
@@ -164,13 +166,14 @@
     }
   }
   initialiseRole();
-  document.getElementById('dashboardBoxesSave').addEventListener('click', () => {
+  document.getElementById('dashboardBoxesSave').addEventListener('click', async () => {
     if (!mainDashboard) return;
     try {
       origins(input.value, location.origin);
-      localStorage.setItem(storageKey, input.value.trim());
-      configure(input.value);
-      note.textContent = 'Saved on this browser. Open Live to see active users. Each box needs TinyPPI 2.13.3 or newer.';
+      await TinyPPI.saveDashboardTrust(input.value.trim());
+      try { localStorage.setItem(storageKey, input.value.trim()); } catch (_) {}
+      note.textContent = 'Opgeslagen. Laat elke andere box dit hoofd-dashboard vertrouwen in de addoninstellingen.';
+      location.reload();
     } catch (error) { note.textContent = error.message; }
   });
   setInterval(() => {

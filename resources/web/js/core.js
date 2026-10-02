@@ -131,7 +131,22 @@ window.TinyPPI = (function () {
     return node;
   }
 
-  let token = localStorage.getItem(TOKEN_KEY) || "";
+  /* Guarded like every other read of storage here: a browser that blocks it
+     (Safari with every cookie blocked, some in-app web views) throws on the
+     first touch, and an exception out here would take the whole module -- and
+     with it the page -- down before it had drawn anything.  Without storage
+     the token simply lasts as long as the tab. */
+  function storedToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ""; }
+    catch (_) { return ""; }
+  }
+
+  function storeToken(value) {
+    try { localStorage.setItem(TOKEN_KEY, value); }
+    catch (_) { /* kept for this tab only */ }
+  }
+
+  let token = storedToken();
   let onState = null;
   let source = null;
   let retryAt = 1000;
@@ -140,14 +155,15 @@ window.TinyPPI = (function () {
   // Open frames must pick up token changes made on this same box in another tab.
   // Browser-partitioned frames can still enter their token using their own button.
   window.addEventListener('storage', (event) => {
-    if (event.key !== TOKEN_KEY || event.storageArea !== localStorage) return;
+    if (event.key !== TOKEN_KEY) return;
+    try { if (event.storageArea !== localStorage) return; } catch (_) { return; }
     token = event.newValue || '';
     document.dispatchEvent(new CustomEvent('tinyppi-token'));
     connect();
   });
   /* The last whole snapshot.  Everything after the first frame of a
-     connection arrives as a delta measured against it (see _snapshot_delta in
-     web/server.py), so it is what those are applied to. */
+     connection arrives as a delta measured against it (see snapshot_delta in
+     web/delta.py), so it is what those are applied to. */
   let base = null;
   let statusEl = null;
   let statusText = null;
@@ -185,7 +201,7 @@ window.TinyPPI = (function () {
         return;
       }
       token = tokenInput.value.trim().toUpperCase();
-      localStorage.setItem(TOKEN_KEY, token);
+      storeToken(token);
       /* The settings tab shows which token this device holds. */
       document.dispatchEvent(new CustomEvent("tinyppi-token"));
       /* The stream carries the token in its URL -- an EventSource cannot send
@@ -214,6 +230,15 @@ window.TinyPPI = (function () {
     return token
       ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token)
       : url;
+  }
+
+  async function saveDashboardTrust(origins) {
+    const response = await fetch('/api/dashboard/trust', {
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-TinyPPI-Token': token},
+      body: JSON.stringify({origins})
+    });
+    if (response.status === 401) askToken();
+    if (!response.ok) throw new Error('Token van deze box nodig om vertrouwde dashboards op te slaan (' + response.status + ')');
   }
 
   let toastTimer = 0;
@@ -457,6 +482,16 @@ window.TinyPPI = (function () {
         if (new URLSearchParams(location.search).get('embedded') !== '1') askToken();
         return;
       }
+      if (response.status === 429) {
+        /* Too many wrong tokens from this device: the add-on will not look at
+           another for a while and says how long, so the page waits that out
+           rather than spending it on attempts that are turned away unread. */
+        setStatus("down", T.token_bad);
+        toast(T.token_bad, true);
+        return response.json().then(
+          (answer) => scheduleRetry(Math.max((answer && answer.retry_ms) || 0, 5000)),
+          () => scheduleRetry(60000));
+      }
       return response.json().then((state) => {
         if (state && state.streams_full) {
           /* Another tab, or this phone before it was locked.  A slot comes
@@ -617,7 +652,7 @@ window.TinyPPI = (function () {
 
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
-    copyReport, reportLine, command, getJSON, withToken,
+    copyReport, reportLine, command, getJSON, withToken, saveDashboardTrust,
     disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled,
     get token() { return token; }
   };
