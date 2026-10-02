@@ -23,7 +23,11 @@
         <description lang="hu">Megnyit egy külön folyamatinformációs ablakot. Ez az ablak az aktuálisan lejátszott média kodek-, videó- és hangadatait jeleníti meg.</description>
         <description lang="zh">打开一个独立的进程信息窗口。此窗口显示当前播放媒体的编解码器、视频和音频详细信息。</description>
         <!-- The latest version only: replace this entry on every version bump. -->
-        <news>v2.14.1
+        <news>v2.14.2 (Jellyfin fork)
+- Incorporates upstream 2.14.1 while preserving user dashboards, per-box tokens and Kodi artwork.
+- Dashboard framing requires explicit trusted LAN or tailnet dashboard origins; other sites remain blocked.
+
+Upstream v2.14.1
 - Web dashboard: much lighter on the box during library scans; the film and series lists stay current and are read only once for all open pages.
 - Web dashboard: the now-playing artwork comes from Kodi's texture cache.
 - Web dashboard: a device trying ten different wrong tokens is locked out for ten minutes; opened under a name outside the home network, the page always asks for the token.
