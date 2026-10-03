@@ -606,7 +606,9 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             self._send_error_json(HTTPStatus.BAD_REQUEST, "invalid dashboard addresses")
             return
-        settings.addon().setSetting("web_dashboard_trust", " ".join(origins))
+        if not settings.addon().setSetting("web_dashboard_trust", " ".join(origins)):
+            self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "dashboard setting could not be saved")
+            return
         self._send_json({"ok": True})
 
 # Read routes; they need the token only when reading does.

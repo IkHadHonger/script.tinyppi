@@ -38,6 +38,7 @@ class Addon:
 
     def setSetting(self, key, value):
         SETTINGS[key] = str(value)
+        return True
 
     def getLocalizedString(self, string_id):
         return f"#{string_id}"

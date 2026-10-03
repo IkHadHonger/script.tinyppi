@@ -1843,6 +1843,22 @@ msgctxt "#32588"
 msgid "Recently added"
 msgstr "أضيفت مؤخرًا"
 
+msgctxt "#32590"
+msgid "Main dashboard (manage other TinyPPI boxes)"
+msgstr "Main dashboard (manage other TinyPPI boxes)"
+
+msgctxt "#32591"
+msgid "Enable only on the central dashboard box. Leave disabled on participant boxes."
+msgstr "Enable only on the central dashboard box. Leave disabled on participant boxes."
+
+msgctxt "#32592"
+msgid "Trusted dashboard addresses"
+msgstr "Trusted dashboard addresses"
+
+msgctxt "#32593"
+msgid "On participant boxes, enter the exact main dashboard address, e.g. http://192.168.1.15:8099. Separate multiple addresses with spaces. Only trusted LAN or tailnet IP addresses are accepted."
+msgstr "On participant boxes, enter the exact main dashboard address, e.g. http://192.168.1.15:8099. Separate multiple addresses with spaces. Only trusted LAN or tailnet IP addresses are accepted."
+
 msgctxt "#32589"
 msgid "(Default)"
 msgstr "(افتراضي)"

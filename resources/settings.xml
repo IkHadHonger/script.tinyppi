@@ -2010,7 +2010,7 @@
                     <default>false</default>
                     <control type="toggle" />
                 </setting>
-                <setting id="web_main_dashboard" type="boolean" label="Hoofddashboard (andere TinyPPI-boxen beheren)" help="Alleen inschakelen op je centrale dashboardbox. Andere boxen blijven hun eigen gebruiker en bediening tonen.">
+                <setting id="web_main_dashboard" type="boolean" label="32590" help="32591">
                     <level>0</level>
                     <default>false</default>
                     <control type="toggle" />
@@ -2079,8 +2079,8 @@
                     </dependencies>
                     <control type="toggle" />
                 </setting>
-                <setting id="web_dashboard_trust" type="string" label="Trusted dashboard addresses (include main Cube address on other boxes)">
-                    <level>2</level>
+                <setting id="web_dashboard_trust" type="string" label="32592" help="32593">
+                    <level>0</level>
                     <default></default>
                     <control type="edit" format="string" />
                 </setting>

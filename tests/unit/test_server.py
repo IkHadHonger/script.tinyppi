@@ -97,6 +97,13 @@ def test_dashboard_trust_is_token_protected_and_explicit(dashboard):
     assert json.loads(request(dashboard, "/api/hello")[2])["dashboard_trust"] == [payload["origins"]]
 
 
+def test_failed_dashboard_setting_save_is_not_reported_as_success(dashboard, monkeypatch):
+    import xbmcaddon
+    monkeypatch.setattr(xbmcaddon.Addon, 'setSetting', lambda *args: False)
+    assert request(dashboard, "/api/dashboard/trust", "POST",
+                   {"origins": "http://192.168.1.15:8099"}, token=TOKEN)[0] == 500
+
+
 def test_writing_needs_the_token(dashboard):
     assert request(dashboard, "/api/mode", "POST", {"mode": "nope"})[0] == 401
     assert request(dashboard, "/api/mode", "POST", {"mode": "nope"}, token="WRONG")[0] == 401

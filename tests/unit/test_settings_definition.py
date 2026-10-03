@@ -48,6 +48,14 @@ def test_ids_are_unique():
     assert len(IDS) == len(set(IDS))
 
 
+def test_setting_labels_are_localized_ids():
+    # Kodi settings labels/help accept numeric localization IDs, not prose.
+    for setting in SETTINGS:
+        for attribute in ('label', 'help'):
+            value = setting.get(attribute)
+            assert value is None or value.isdigit(), (setting.get('id'), attribute, value)
+
+
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_every_text_exists(language):
     table = strings(language)
