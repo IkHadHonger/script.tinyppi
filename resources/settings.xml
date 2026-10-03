@@ -2082,7 +2082,12 @@
                 <setting id="web_dashboard_trust" type="string" label="32592" help="32593">
                     <level>0</level>
                     <default></default>
-                    <control type="edit" format="string" />
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <heading>32592</heading>
+                    </control>
                 </setting>
                 <setting id="web_auth_read" type="boolean" label="32440" help="32441">
                     <level>0</level>

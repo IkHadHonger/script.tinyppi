@@ -56,6 +56,14 @@ def test_setting_labels_are_localized_ids():
             assert value is None or value.isdigit(), (setting.get('id'), attribute, value)
 
 
+def test_empty_string_defaults_are_explicitly_allowed():
+    # Kodi rejects the entire string setting when its default is empty
+    # but allowempty is not enabled; it then disappears from the dialog.
+    for setting in SETTINGS:
+        if setting.get('type') == 'string' and not setting.findtext('default'):
+            assert setting.findtext('constraints/allowempty') == 'true', setting.get('id')
+
+
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_every_text_exists(language):
     table = strings(language)
