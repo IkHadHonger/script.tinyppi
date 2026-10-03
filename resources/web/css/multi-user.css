@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 .user-dashboards, .user-dashboards-summary { display: none; }
-.tinyppi-multi #tab-live > :not(.user-dashboards):not(.user-dashboards-summary) { display: none !important; }
+.tinyppi-multi #tab-live > :not(.user-dashboards):not(.user-dashboards-summary):not(.infuse-sessions) { display: none !important; }
 .tinyppi-multi .user-dashboards-summary { display: block; color: var(--muted); overflow-wrap: anywhere; }
 .tinyppi-multi .user-dashboards {
   display: flex; align-items: flex-start; gap: 18px; overflow-x: auto;
@@ -31,3 +31,18 @@
 .tinyppi-multi #tab-live { align-content: start; }
 .tinyppi-embedded .tabpanel { padding-bottom: 0 !important; }
 #dashboardBoxes { width: 100%; min-height: 85px; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.infuse-sessions:empty { display: none; }
+.infuse-sessions { display: grid; gap: 18px; width: 100%; min-width: 0; }
+.infuse-session { padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface, var(--bg)); }
+.infuse-hero { display: flex; gap: 18px; align-items: start; }
+.infuse-poster { width: 110px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px; }
+.infuse-heading { min-width: 0; overflow-wrap: anywhere; }
+.infuse-heading h2 { margin: 12px 0; }
+.infuse-session progress { width: 100%; margin-top: 20px; }
+.infuse-timing, .infuse-note { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.infuse-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.infuse-metrics { border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.infuse-metrics h3 { font-size: 12px; }
+.infuse-metrics dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); font-size: 12px; gap: 12px; }
+.infuse-metrics dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+@media (max-width: 899px) { .infuse-grid { grid-template-columns: 1fr; } }

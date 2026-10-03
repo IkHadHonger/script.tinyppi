@@ -84,6 +84,11 @@
   summary.className = 'user-dashboards-summary';
   panel.append(summary, row);
   let boxes = [];
+  let infuseCount = 0;
+  document.addEventListener('tinyppi-infuse-count', event => {
+    infuseCount = Number.isInteger(event.detail) && event.detail > 0 ? event.detail : 0;
+    describe();
+  });
   function describe() {
     const now = Date.now();
     const active = boxes.filter((box) => activeBox(box, now));
@@ -94,7 +99,7 @@
       box.frame.setAttribute('aria-hidden', String(!visible));
     }
     row.classList.toggle('single-user', active.length === 1);
-    summary.textContent = active.length ? '' : 'Geen actieve gebruikers';
+    summary.textContent = active.length || infuseCount ? '' : 'Geen actieve gebruikers';
     if (boxes.length) {
       const connected = boxes.some((box) => box.connected === true && now - box.updated < 12000);
       TinyPPI.setStatus(connected ? 'live' : 'wait', connected ? TinyPPI.T.connected : TinyPPI.T.connecting);

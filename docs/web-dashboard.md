@@ -447,3 +447,19 @@ The dashboard is reachable by anything on the same network while it is on, so:
 
 Leave port 8080 alone; Kodi's own web server usually has it. 8099 is the
 default here.
+
+### Infuse sessions on the main dashboard
+
+The main dashboard lists active Infuse sessions from the Jellyfin server
+configured in Jellyfin for Kodi on that box. The saved account must be allowed
+to see the relevant sessions. No Jellyfin credentials are sent to the browser.
+Other TinyPPI boxes and embedded cards do not poll or duplicate these sessions.
+
+Each card separates source-file metadata, Infuse session reports and Jellyfin
+server transcoding statistics. Server encoder speed is not the Apple TV's
+display frame rate. CPU, temperature, dropped frames, decoder buffers and actual
+HDMI output are unavailable through this integration and are never invented.
+For a device named Apple TV/tvOS playing a Profile 7 source with an HDR10 base,
+HDR10 fallback is labelled expected but explicitly unconfirmed. Other devices,
+unknown source versions and transcoded streams do not get that label.
+Missing fields remain "Niet gemeld". Cards are cleared if polling fails.

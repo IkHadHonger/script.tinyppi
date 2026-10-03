@@ -42,13 +42,15 @@ def _clock(seconds: float) -> str:
             else f"{minutes}:{seconds:02d}")
 
 
-def _first_stream(streams, kind: str, index=None) -> dict:
+def _first_stream(streams, kind: str, index=None, strict=False) -> dict:
     candidates = [stream for stream in streams
                   if _text(stream.get("Type")).lower() == kind.lower()]
     if index is not None:
         for stream in candidates:
             if stream.get("Index") == index:
                 return stream
+        if strict:
+            return {}
     return candidates[0] if candidates else {}
 
 
@@ -92,6 +94,19 @@ def _hdr_label(item: dict, video: dict) -> str:
     if "hlg" in range_type.lower():
         return "HLG"
     return range_type
+
+
+def _infuse_output(session: dict, video: dict, transcode: dict) -> dict:
+    """An explicitly unverified expectation, never an HDMI measurement."""
+    device = _text(session.get("DeviceName")).lower().replace(" ", "")
+    apple_tv = "appletv" in device or "tvos" in device
+    profile = video.get("DvProfile")
+    hdr10_base = (video.get("DvBlSignalCompatibilityId") == 1 or
+                  "hdr10" in _text(video.get("VideoRangeType")).lower())
+    expected = ("HDR10-fallback verwacht" if hdr10_base else
+                "HDR10-fallback mogelijk") if apple_tv and profile == 7 and not transcode else "Niet gemeld"
+    return {"expected": expected, "confirmed": False,
+            "basis": "Bronbestand en apparaatnaam; geen uitvoermeting"}
 
 
 class JellyfinBridge:
@@ -223,7 +238,7 @@ class JellyfinBridge:
         user_id = connection.get("user_id")
         if not user_id:
             return item
-        params = urlencode({"Fields": "MediaStreams,Genres,Tags,Overview"})
+        params = urlencode({"Fields": "MediaStreams,MediaSources,Genres,Tags,Overview"})
         try:
             detailed = self._request(
                 connection,
@@ -298,7 +313,7 @@ class JellyfinBridge:
         if isinstance(reasons, str):
             reasons = [part.strip() for part in reasons.split(",") if part.strip()]
 
-        return {
+        result = {
             "id": _text(session.get("Id")),
             "user": _text(session.get("UserName")) or "Unknown user",
             "client": _text(session.get("Client")),
@@ -346,6 +361,60 @@ class JellyfinBridge:
             "bitrate": round(_number(bitrate) / 1_000_000.0, 1) if bitrate else None,
             "reasons": reasons,
         }
+        if "infuse" in _text(session.get("Client")).lower():
+            # File metadata, session reports and server encoder statistics have
+            # different provenance. Never turn any of them into Apple TV HDMI
+            # output, decoder, thermal or dropped-frame measurements.
+            sources = item.get("MediaSources") or []
+            source_id = state.get("MediaSourceId")
+            source = next((entry for entry in sources
+                           if source_id and entry.get("Id") == source_id), {})
+            if not source_id and len(sources) == 1:
+                source = sources[0]
+            ambiguous_source = bool(sources) and not source
+            source_streams = (source.get("MediaStreams") or streams) if not ambiguous_source else []
+            source_video = _first_stream(source_streams, "Video")
+            source_audio = _first_stream(source_streams, "Audio", state.get("AudioStreamIndex"), strict=True)
+            subtitle_index = state.get("SubtitleStreamIndex")
+            source_subtitle = (_first_stream(source_streams, "Subtitle", subtitle_index, strict=True)
+                               if isinstance(subtitle_index, int) and subtitle_index >= 0 else {})
+            reported_method = _text(session.get("PlayMethod") or state.get("PlayMethod"))
+            result["method"] = reported_method or ("Transcode" if transcode else "Unknown")
+            result["infuse"] = {
+                "source": {
+                    "codec": _text(source_video.get("Codec")),
+                    "width": source_video.get("Width"),
+                    "height": source_video.get("Height"),
+                    "frame_rate": source_video.get("RealFrameRate") or source_video.get("AverageFrameRate"),
+                    "bit_depth": source_video.get("BitDepth"),
+                    "range": _hdr_label(item, source_video),
+                    "bitrate": source.get("Bitrate") or (item.get("Bitrate") if not ambiguous_source else None),
+                    "container": _text(source.get("Container") or (item.get("Container") if not ambiguous_source else "")),
+                    "audio_codec": _text(source_audio.get("Codec")),
+                    "audio_channels": _channel_label(source_audio),
+                    "audio_language": _text(source_audio.get("Language")),
+                    "subtitle": _text(source_subtitle.get("DisplayTitle") or source_subtitle.get("Language")),
+                },
+                "session": {
+                    "audio_index": state.get("AudioStreamIndex"),
+                    "subtitle_index": subtitle_index,
+                    "can_seek": state.get("CanSeek"),
+                },
+                "server": {
+                    "transcoding": bool(transcode),
+                    "video_codec": _text(transcode.get("VideoCodec")),
+                    "audio_codec": _text(transcode.get("AudioCodec")),
+                    "width": transcode.get("Width"),
+                    "height": transcode.get("Height"),
+                    "bitrate": transcode.get("Bitrate"),
+                    "encoder_fps": transcode.get("Framerate"),
+                    "completion": transcode.get("CompletionPercentage"),
+                    "reasons": reasons,
+                },
+                "hardware_available": False,
+                "output": _infuse_output(session, source_video, transcode),
+            }
+        return result
 
     def artwork(self, item_id: str, kind: str):
         connection = self._connection()
