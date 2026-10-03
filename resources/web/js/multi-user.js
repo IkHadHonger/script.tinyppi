@@ -24,7 +24,16 @@
   function needsRetry(box, now) {
     return now - box.updated >= 12000 && now - box.attempted >= 30000;
   }
-  if (typeof module !== 'undefined') { module.exports = { origins, isMainDashboard, activeBox, needsRetry }; return; }
+  function localSnapshot(box, event, own) {
+    // Only the configured own frame may populate the outer box's library and
+    // statistics. Never accept another user's player state or a forged sender.
+    if (!box || box.origin !== own || event.origin !== own ||
+        box.frame.contentWindow !== event.source) return null;
+    const snapshot = event.data && event.data.snapshot;
+    return snapshot && typeof snapshot.playing === 'boolean' &&
+      typeof snapshot.control === 'boolean' ? snapshot : null;
+  }
+  if (typeof module !== 'undefined') { module.exports = { origins, isMainDashboard, activeBox, needsRetry, localSnapshot }; return; }
   const embedded = new URLSearchParams(location.search).get('embedded') === '1';
   const panel = document.getElementById('tab-live');
   if (!panel) return;
@@ -46,6 +55,7 @@
     let target;
     try { target = new URL(document.referrer).origin; } catch (_) { target = null; }
     let playing = null;
+    let snapshot = null;
     let user = '';
     function report() {
       user = document.querySelector('.jellyfin-user')?.textContent || user;
@@ -60,10 +70,12 @@
         height: Math.ceil(main.getBoundingClientRect().height +
           navigation.getBoundingClientRect().height +
           document.querySelector('.topbar').getBoundingClientRect().height) + 24,
-        version: document.getElementById('version').textContent}, target);
+        version: document.getElementById('version').textContent,
+        snapshot: target === location.origin ? snapshot : null}, target);
     }
     document.addEventListener('tinyppi-state', (event) => {
       playing = !!event.detail.playing;
+      snapshot = event.detail.snapshot || null;
     });
     document.addEventListener('tinyppi-user', (event) => { user = event.detail || ''; });
     new ResizeObserver(report).observe(main);
@@ -148,6 +160,8 @@
     box.playing = event.data.playing;
     box.connected = event.data.connected;
     box.user = typeof event.data.user === 'string' ? event.data.user.slice(0, 120) : '';
+    const snapshot = localSnapshot(box, event, location.origin);
+    if (snapshot) TinyPPI.receiveSharedState(snapshot);
     if (Number.isFinite(event.data.height)) {
       box.frame.style.height = Math.min(12000, Math.max(400, event.data.height)) + 'px';
     }

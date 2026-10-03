@@ -360,6 +360,16 @@ window.TinyPPI = (function () {
     catch (_) { /* a page that throws must not take the stream with it */ }
   }
 
+  /* The own embedded card owns the SSE connection in multi-box mode.  Its
+     validated snapshot still feeds the outer library/history tabs, even if
+     the connection was closed before the outer page received its first frame. */
+  function receiveSharedState(snapshot) {
+    if (streamEnabled || !snapshot || typeof snapshot !== "object" ||
+        typeof snapshot.playing !== "boolean" || typeof snapshot.control !== "boolean") return false;
+    deliver(snapshot);
+    return true;
+  }
+
   /* --- delta frames ------------------------------------------------------ */
 
   /* What the add-on sends after the first frame is only what moved.  The two
@@ -653,7 +663,7 @@ window.TinyPPI = (function () {
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
     copyReport, reportLine, command, getJSON, withToken, saveDashboardTrust,
-    disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled,
+    disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled, receiveSharedState,
     get token() { return token; }
   };
 

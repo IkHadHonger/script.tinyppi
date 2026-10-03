@@ -303,7 +303,7 @@ renderToken();
 /* --- render ------------------------------------------------------------- */
 
 function render(next) {
-  document.dispatchEvent(new CustomEvent('tinyppi-state', {detail: {playing: !!next.playing}}));
+  document.dispatchEvent(new CustomEvent('tinyppi-state', {detail: {playing: !!next.playing, snapshot: next}}));
   state = next;
   control = !!next.control;
   /* Before anything is drawn: what the box says about its own library decides
