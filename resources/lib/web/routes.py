@@ -606,7 +606,12 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             self._send_error_json(HTTPStatus.BAD_REQUEST, "invalid dashboard addresses")
             return
-        if not settings.addon().setSetting("web_dashboard_trust", " ".join(origins)):
+        addon = settings.addon()
+        value = " ".join(origins)
+        # Kodi's setSetting returns None on successful writes on some builds.
+        # Verify the stored value rather than interpreting its return value.
+        addon.setSetting("web_dashboard_trust", value)
+        if addon.getSetting("web_dashboard_trust") != value:
             self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "dashboard setting could not be saved")
             return
         self._send_json({"ok": True})
