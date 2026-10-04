@@ -148,7 +148,9 @@ class _Server(ThreadingHTTPServer):
         # Open connections and their addresses, so stop() can hang up on
         # idle keep-alives and verify_request() can cap them.
         self._connections: dict = {}
-        self._refusal_logged = 0.0
+        # The monotonic clock can start near zero on a fresh CI runner or
+        # box. The first refusal must be logged regardless of its uptime.
+        self._refusal_logged = float("-inf")
         # Cached poster and fanart of the playing title.
         self._art = artwork.PlayingArtwork()
 

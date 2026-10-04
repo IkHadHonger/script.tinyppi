@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from types import SimpleNamespace
 
 import pytest
 
@@ -151,3 +152,26 @@ def test_tokens_and_ports():
     for value, port in (("8123", 8123), ("80", 8099), ("70000", 8099), ("x", 8099)):
         addon.setSetting("web_port", value)
         assert web_server.configured_port(addon) == port
+
+
+@pytest.mark.parametrize("uptime", [0.0, 1.0, 59.0, 1000.0])
+def test_first_refusal_is_logged_at_any_uptime_and_repeats_are_throttled(monkeypatch, uptime):
+    now = uptime
+    monkeypatch.setattr(web_server, "time", SimpleNamespace(monotonic=lambda: now))
+    srv = web_server._Server(("127.0.0.1", 0), IdleProducer(), threading.Event(), TOKEN)
+    try:
+        srv._connections = {object(): "127.0.0.1" for _ in range(16)}
+        refusals = lambda: [message for _level, message in xbmc.LOG
+                            if "refusing a connection" in message]
+        assert srv.verify_request(None, ("127.0.0.1", 1)) is False
+        assert len(refusals()) == 1
+        now = uptime + 59.0
+        assert srv.verify_request(None, ("127.0.0.1", 2)) is False
+        assert len(refusals()) == 1
+        now = uptime + 60.0
+        assert srv.verify_request(None, ("127.0.0.1", 3)) is False
+        assert len(refusals()) == 2
+        srv._connections.clear()
+        assert srv.verify_request(None, ("127.0.0.1", 4)) is True
+    finally:
+        srv.server_close()
