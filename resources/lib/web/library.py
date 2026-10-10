@@ -16,11 +16,12 @@ when the series is opened, then cached alongside.
 import threading
 import time
 import zlib
+from collections.abc import Callable
 
 import xbmc
-
 from core.log import channel
-from web.snapshot import clean_value, rpc
+from web.player import rpc
+from web.values import Unchecked, clean_value, library_id
 
 # Film properties the tiles need.  ``dateadded`` feeds the "recently added"
 # row (see ``_added``), read here so the row matches the wall.
@@ -69,7 +70,8 @@ class _Slot:
     would serve the old list until the TTL ran out.
     """
 
-    def __init__(self, cache: "_Cache", read) -> None:
+    def __init__(self, cache: "_Cache", read: Callable[[], dict]) -> None:
+
         self._cache   = cache
         self._read    = read
         self._value: dict | None = None
@@ -274,7 +276,7 @@ def _read() -> dict:
         if not title:
             continue
 
-        pictures = row.get("art") if isinstance(row.get("art"), dict) else {}
+        pictures = _art_of(row)
         poster = _picture(pictures, _POSTER_KEYS)
         art[movie_id] = {"poster": poster,
                          "fanart": _picture(pictures, _FANART_KEYS)}
@@ -309,6 +311,12 @@ def _read() -> dict:
             "tag": f"{len(films):x}-{signature:08x}"}
 
 
+def _art_of(row: dict) -> dict:
+    """Return a JSON-RPC row's ``art`` mapping, or an empty one."""
+    pictures = row.get("art")
+    return pictures if isinstance(pictures, dict) else {}
+
+
 def _picture(pictures: dict, keys: tuple[str, ...]) -> str:
     for key in keys:
         path = pictures.get(key)
@@ -317,7 +325,7 @@ def _picture(pictures: dict, keys: tuple[str, ...]) -> str:
     return ""
 
 
-def _rate(entry: dict, ratings) -> None:
+def _rate(entry: dict, ratings: object) -> None:
     """Set the best available rating and its source on *entry*.
 
     Nothing is set without a valid rating (e.g. unscraped files).
@@ -340,7 +348,7 @@ def _rate(entry: dict, ratings) -> None:
         return
 
 
-def _resume(resume) -> int:
+def _resume(resume: object) -> int:
     """Return the resume position in seconds, or 0 below 30 seconds."""
     if not isinstance(resume, dict):
         return 0
@@ -359,7 +367,7 @@ def _resume(resume) -> int:
 _ART_REVISION = "#2"
 
 
-def _added(value) -> str:
+def _added(value: object) -> str:
     """Return the date added as Kodi's sortable text, or ''."""
     if not isinstance(value, str):
         return ""
@@ -379,18 +387,15 @@ def _tag(path: str) -> str:
 
 # --- Starting one ----------------------------------------------------------
 
-def play(movie_id, resume: bool = True) -> bool:
+def play(movie_id: Unchecked, resume: bool = True) -> bool:
     """Play a film and return whether Kodi accepted it.
 
     Resumes when a resume point exists, unless *resume* is False; the option
     is always explicit so Kodi does not ask on the TV.  JSON-RPC reports
     success, unlike a builtin.
     """
-    try:
-        wanted = int(movie_id)
-    except (TypeError, ValueError):
-        return False
-    if wanted <= 0:
+    wanted = library_id(movie_id)
+    if not wanted:
         return False
 
     params: dict = {"item": {"movieid": wanted}}
@@ -435,16 +440,13 @@ def shows() -> dict:
             "tag": held["tag"]}
 
 
-def episodes(show_id) -> dict | None:
+def episodes(show_id: Unchecked) -> dict | None:
     """Return the episodes of show *show_id*, or None for an unknown show.
 
     Read on first open, then cached.
     """
-    try:
-        wanted = int(show_id)
-    except (TypeError, ValueError):
-        return None
-    if wanted <= 0:
+    wanted = library_id(show_id)
+    if not wanted:
         return None
 
     with _cache.lock:
@@ -468,24 +470,20 @@ def episodes(show_id) -> dict | None:
             "tag": held["tag"]}
 
 
-def show_art_path(show_id, kind: str) -> str:
+def show_art_path(show_id: Unchecked, kind: str) -> str:
     """Return a show's raw artwork path, or ''."""
-    try:
-        entry = _show_catalogue()["art"].get(int(show_id)) or {}
-    except (TypeError, ValueError):
-        return ""
+    entry = _show_catalogue()["art"].get(library_id(show_id)) or {}
     return entry.get(kind, "")
 
 
-def episode_art_path(episode_id, kind: str) -> str:
+def episode_art_path(episode_id: Unchecked, kind: str) -> str:
     """Return an episode still's raw path, or ''.
 
     Only episodes of opened shows or on the "continue" row are known, the
     only ways their URLs can reach a browser.
     """
-    try:
-        wanted = int(episode_id)
-    except (TypeError, ValueError):
+    wanted = library_id(episode_id)
+    if not wanted:
         return ""
     with _cache.lock:
         entry = _cache.episode_art.get(wanted)
@@ -531,7 +529,7 @@ def _read_shows() -> dict:
         if not title:
             continue
 
-        pictures = row.get("art") if isinstance(row.get("art"), dict) else {}
+        pictures = _art_of(row)
         poster = _picture(pictures, _POSTER_KEYS)
         fanart = _picture(pictures, _FANART_KEYS)
         art[show_id] = {"poster": poster, "fanart": fanart}
@@ -602,7 +600,7 @@ def _read_episodes(show_id: int, title: str) -> dict:
         if not isinstance(episode_id, int):
             continue
 
-        pictures = row.get("art") if isinstance(row.get("art"), dict) else {}
+        pictures = _art_of(row)
         still = _picture(pictures, _EPISODE_PICTURE_KEYS)
         art[episode_id] = {"thumb": still}
 
@@ -639,16 +637,13 @@ def _read_episodes(show_id: int, title: str) -> dict:
             "tag": f"{show_id:x}-{len(listing):x}-{signature:08x}"}
 
 
-def play_episode(episode_id, resume: bool = True) -> bool:
+def play_episode(episode_id: Unchecked, resume: bool = True) -> bool:
     """Play an episode and return whether Kodi accepted it.
 
     Resumes like ``play``; the resume point comes from the cached lists.
     """
-    try:
-        wanted = int(episode_id)
-    except (TypeError, ValueError):
-        return False
-    if wanted <= 0:
+    wanted = library_id(episode_id)
+    if not wanted:
         return False
 
     params: dict = {"item": {"episodeid": wanted}}
@@ -699,18 +694,15 @@ _MARKABLE = {
 }
 
 
-def set_watched(kind: str, item_id, watched: bool) -> bool:
+def set_watched(kind: str, item_id: Unchecked, watched: bool) -> bool:
     """Mark a film, episode or show as watched or unwatched, like Kodi does.
 
     Watched sets a play count and clears the resume point; unwatched clears
     the play count and keeps the resume point.  Returns whether the library
     accepted it; the cache is dropped either way.
     """
-    try:
-        wanted = int(item_id)
-    except (TypeError, ValueError):
-        return False
-    if wanted <= 0:
+    wanted = library_id(item_id)
+    if not wanted:
         return False
 
     if kind == "tvshow":
@@ -727,15 +719,12 @@ def set_watched(kind: str, item_id, watched: bool) -> bool:
     return done
 
 
-def clear_resume(kind: str, item_id) -> bool:
+def clear_resume(kind: str, item_id: Unchecked) -> bool:
     """Clear a film's or episode's resume point, keeping its play count."""
     if kind not in _MARKABLE:
         return False
-    try:
-        wanted = int(item_id)
-    except (TypeError, ValueError):
-        return False
-    if wanted <= 0:
+    wanted = library_id(item_id)
+    if not wanted:
         return False
     key, method = _MARKABLE[kind]
     done = rpc(method, {key: wanted,
@@ -842,7 +831,7 @@ def _read_continuing() -> dict:
         # A film without a title cannot be shown.
         if entry is None or not entry["title"]:
             continue
-        pictures = row.get("art") if isinstance(row.get("art"), dict) else {}
+        pictures = _art_of(row)
         entry["poster"] = _tag(_picture(pictures, _POSTER_KEYS))
         year = row.get("year")
         if isinstance(year, int) and year > 0:
@@ -864,7 +853,7 @@ def _read_continuing() -> dict:
         entry = _continue_entry(row, "episode")
         if entry is None:
             continue
-        pictures = row.get("art") if isinstance(row.get("art"), dict) else {}
+        pictures = _art_of(row)
         poster = _picture(pictures, _EPISODE_POSTER_KEYS)
         still = _picture(pictures, _EPISODE_PICTURE_KEYS)
         art[entry["id"]] = {"poster": poster, "thumb": still}
@@ -924,7 +913,7 @@ def _show_ratings() -> dict[int, dict]:
     return rated
 
 
-def _continue_entry(row, kind: str) -> dict | None:
+def _continue_entry(row: dict, kind: str) -> dict | None:
     """Return the common fields of a "continue" entry, or None.
 
     None without an id or a meaningful resume point.

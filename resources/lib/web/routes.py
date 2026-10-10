@@ -15,19 +15,23 @@ import secrets
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
 import xbmc
-
 from core import settings
 from core.log import channel
 from web import access, artwork, library
-from web.dashboard_trust import trusted_origins, page_policy
+from web.dashboard_trust import page_policy, trusted_origins
 from web.delta import snapshot_delta
+from web.player import apply_command
 from web.producer import PRODUCE_INTERVAL, Producer
-from web.snapshot import apply_command, apply_mode
 from web.static import MIN_COMPRESS, STATIC_CACHE
 from web.strings import ui_strings
+from web.vs10 import apply_mode
+
+if TYPE_CHECKING:  # web.server imports this module
+    from web.server import _Server
 
 # Heartbeat interval on an idle stream, so dropped connections are noticed.
 _HEARTBEAT_INTERVAL = 15.0
@@ -40,7 +44,7 @@ _HEARTBEAT_INTERVAL = 15.0
 # runs; it exceeds Kodi's five-second stop limit, so stop() hangs up instead
 # of waiting (_Server.close_connections in web/server.py).
 # _STREAM_WRITE_TIMEOUT bounds a write to a stream that stopped reading.
-_REQUEST_TIMEOUT      = 15.0
+_REQUEST_TIMEOUT = 15.0
 _STREAM_WRITE_TIMEOUT = 4.0
 
 # Maximum request body size (POST bodies are tiny).
@@ -62,17 +66,19 @@ _SECURITY_HEADERS = (
 # Content Security Policy of the page: only its own files and API, no inline
 # script or style, no other origin.  Nothing loads from the internet anyway,
 # so an injected script (e.g. in a title) has nowhere to run.
-_PAGE_POLICY = "; ".join((
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self'",
-    "img-src 'self'",
-    "connect-src 'self'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-))
+_PAGE_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    )
+)
 
 
 _log = channel("web", xbmc.LOGINFO)
@@ -82,27 +88,39 @@ class Handler(BaseHTTPRequestHandler):
     """The request handler; ``server`` holds the producer, token and files."""
 
     protocol_version = "HTTP/1.1"
-    server_version   = "TinyPPI"
-    sys_version      = ""
+    server_version = "TinyPPI"
+    sys_version = ""
     # Applied before the first request line, so a silent connection cannot
     # hold a thread forever.
-    timeout          = _REQUEST_TIMEOUT
+    timeout = _REQUEST_TIMEOUT
+
+    server: "_Server"
 
     # --- Plumbing ----------------------------------------------------------
 
-    def log_message(self, fmt: str, *args) -> None:  # noqa: A003 - base API
+    @property
+    def _peer(self) -> str:
+        """The client's address for log lines."""
+        return access.plain_address(self.client_address[0])
+
+    def log_message(self, fmt: str, *args: object) -> None:  # noqa: A003 - base API
         _log(_TOKEN_IN_QUERY.sub(r"\1***", fmt % args), xbmc.LOGDEBUG)
 
-    def _send(self, status: HTTPStatus, body: bytes, content_type: str,
-              extra: tuple[tuple[str, str], ...] = (),
-              cache: str = "no-store") -> None:
+    def _send(
+        self,
+        status: HTTPStatus,
+        body: bytes,
+        content_type: str,
+        extra: tuple[tuple[str, str], ...] = (),
+        cache: str = "no-store",
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         # Live player state must never be cached; static files and art set
         # their own policy.
         self.send_header("Cache-Control", cache)
-        headers = _SECURITY_HEADERS
+        headers: tuple[tuple[str, str], ...] = _SECURITY_HEADERS
         if trusted_origins(settings.addon().getSetting("web_dashboard_trust")):
             headers = tuple((n, v) for n, v in headers if n != "X-Frame-Options")
         for name, value in headers + extra:
@@ -124,19 +142,22 @@ class Handler(BaseHTTPRequestHandler):
             part.strip().removeprefix("W/") for part in offered.split(",")
         ]
 
-    def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK,
-                   etag: str = "", cache: str = "no-store",
-                   extra: tuple[tuple[str, str], ...] = ()) -> None:
+    def _send_json(
+        self,
+        payload: dict,
+        status: HTTPStatus = HTTPStatus.OK,
+        etag: str = "",
+        cache: str = "no-store",
+        extra: tuple[tuple[str, str], ...] = (),
+    ) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         if etag:
             extra += (("ETag", etag),)
         # Large JSON (mainly the chart history) is gzipped.
-        if (len(body) >= MIN_COMPRESS
-                and "gzip" in self.headers.get("Accept-Encoding", "")):
+        if len(body) >= MIN_COMPRESS and "gzip" in self.headers.get("Accept-Encoding", ""):
             body = gzip.compress(body, 6)
             extra += (("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding"))
-        self._send(status, body, "application/json; charset=utf-8", extra,
-                   cache=cache)
+        self._send(status, body, "application/json; charset=utf-8", extra, cache=cache)
 
     def _send_error_json(self, status: HTTPStatus, message: str) -> None:
         self._send_json({"error": message}, status)
@@ -156,19 +177,20 @@ class Handler(BaseHTTPRequestHandler):
         Otherwise it has been answered with 401, or 429 for a locked-out
         address (see ``access.Guesses``).
         """
-        address = self.client_address[0]
+        address = access.client_key(self.client_address[0])
         wait = self.server.guesses.locked_for(address)
         if wait:
-            self._send_json({"error": "too many wrong tokens",
-                             "retry_ms": int(wait * 1000)},
-                            HTTPStatus.TOO_MANY_REQUESTS,
-                            extra=(("Retry-After", str(math.ceil(wait))),))
+            self._send_json(
+                {"error": "too many wrong tokens", "retry_ms": int(wait * 1000)},
+                HTTPStatus.TOO_MANY_REQUESTS,
+                extra=(("Retry-After", str(math.ceil(wait))),),
+            )
             return False
 
         presented = self._presented_token()
         # Compare bytes: compare_digest rejects non-ASCII str.
         expected = self.server.token.encode("utf-8")
-        offered  = presented.encode("utf-8", "replace")
+        offered = presented.encode("utf-8", "replace")
         if len(offered) == len(expected) and secrets.compare_digest(offered, expected):
             return True
         self.server.guesses.wrong(address, presented)
@@ -181,8 +203,7 @@ class Handler(BaseHTTPRequestHandler):
         When the setting says so, or for an untrusted host name (see
         ``access.trusted_host``).
         """
-        return (self.server.auth_read
-                or not access.trusted_host(self.headers.get("Host", "")))
+        return self.server.auth_read or not access.trusted_host(self.headers.get("Host", ""))
 
     # --- Routing -----------------------------------------------------------
 
@@ -228,21 +249,23 @@ class Handler(BaseHTTPRequestHandler):
         flags and UI strings.
         """
         addon = settings.addon()
-        self._send_json({
-            "name":        "TinyPPI",
-            "version":     addon.getAddonInfo("version"),
-            "main_dashboard": addon.getSetting("web_main_dashboard") == "true",
-            "dashboard_trust": trusted_origins(addon.getSetting("web_dashboard_trust")),
-            # Per request, so an untrusted host name asks for the token.
-            "auth_read":   self._token_to_read(),
-            "control":     self.server.allow_control,
-            # The film shelf needs both the library and the control setting.
-            "library":     self.server.offer_library and self.server.allow_control,
-            # The series shelf has its own setting.
-            "series":      self.server.offer_series and self.server.allow_control,
-            "interval_ms": int(PRODUCE_INTERVAL * 1000),
-            "strings":     ui_strings(addon),
-        })
+        self._send_json(
+            {
+                "name": "TinyPPI",
+                "version": addon.getAddonInfo("version"),
+                "main_dashboard": addon.getSetting("web_main_dashboard") == "true",
+                "dashboard_trust": trusted_origins(addon.getSetting("web_dashboard_trust")),
+                # Per request, so an untrusted host name asks for the token.
+                "auth_read": self._token_to_read(),
+                "control": self.server.allow_control,
+                # The film shelf needs both the library and the control setting.
+                "library": self.server.offer_library and self.server.allow_control,
+                # The series shelf has its own setting.
+                "series": self.server.offer_series and self.server.allow_control,
+                "interval_ms": int(PRODUCE_INTERVAL * 1000),
+                "strings": ui_strings(addon),
+            }
+        )
 
     def _serve_state(self) -> None:
         """Send the current snapshot to a page without a stream."""
@@ -258,7 +281,7 @@ class Handler(BaseHTTPRequestHandler):
         if not apply_mode(mode):
             self._send_error_json(HTTPStatus.BAD_REQUEST, "unknown mode")
             return
-        _log(f"VS10 mode '{mode}' requested from {self.client_address[0]}")
+        _log(f"VS10 mode '{mode}' requested from {self._peer}")
         self._send_json({"ok": True, "mode": mode})
 
     def _run_command(self, payload: dict) -> None:
@@ -268,9 +291,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.BAD_REQUEST, "command failed")
             return
         # Seek and volume arrive in bursts, so they log at debug level.
-        _log(f"'{action}' requested from {self.client_address[0]}",
-             xbmc.LOGDEBUG if action in ("seek", "seek_percent", "volume")
-             else xbmc.LOGINFO)
+        _log(
+            f"'{action}' requested from {self._peer}",
+            xbmc.LOGDEBUG if action in ("seek", "seek_percent", "volume") else xbmc.LOGINFO,
+        )
         self._send_json({"ok": True, "action": action})
 
     def _read_json_body(self) -> dict | None:
@@ -312,8 +336,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = library.movies()
         except Exception as exc:
             _log(f"reading the video database failed: {exc}", xbmc.LOGWARNING)
-            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE,
-                                  "library unavailable")
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "library unavailable")
             return
         self._send_listing(payload)
 
@@ -329,7 +352,7 @@ class Handler(BaseHTTPRequestHandler):
             if not library.play_episode(episode_id, resume):
                 self._send_error_json(HTTPStatus.BAD_REQUEST, "playback failed")
                 return
-            _log(f"episode {episode_id} started from {self.client_address[0]}")
+            _log(f"episode {episode_id} started from {self._peer}")
             self._send_json({"ok": True, "episodeid": episode_id})
             return
 
@@ -340,7 +363,7 @@ class Handler(BaseHTTPRequestHandler):
         if not library.play(movie_id, resume):
             self._send_error_json(HTTPStatus.BAD_REQUEST, "playback failed")
             return
-        _log(f"film {movie_id} started from {self.client_address[0]}")
+        _log(f"film {movie_id} started from {self._peer}")
         # The page learns about the playback from the next snapshot.
         self._send_json({"ok": True, "movieid": movie_id})
 
@@ -354,9 +377,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.BAD_REQUEST, "watched required")
             return
         for key, kind, offered in (
-                ("movieid", "movie", self.server.offer_library),
-                ("tvshowid", "tvshow", self.server.offer_series),
-                ("episodeid", "episode", self.server.offer_series)):
+            ("movieid", "movie", self.server.offer_library),
+            ("tvshowid", "tvshow", self.server.offer_series),
+            ("episodeid", "episode", self.server.offer_series),
+        ):
             item_id = payload.get(key)
             if item_id is None:
                 continue
@@ -373,8 +397,9 @@ class Handler(BaseHTTPRequestHandler):
     def _clear_resume(self, payload: dict) -> None:
         """Clear the resume point of a film or episode."""
         for key, kind, offered in (
-                ("movieid", "movie", self.server.offer_library),
-                ("episodeid", "episode", self.server.offer_series)):
+            ("movieid", "movie", self.server.offer_library),
+            ("episodeid", "episode", self.server.offer_series),
+        ):
             item_id = payload.get(key)
             if item_id is None:
                 continue
@@ -397,8 +422,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = library.shows()
         except Exception as exc:
             _log(f"reading the video database failed: {exc}", xbmc.LOGWARNING)
-            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE,
-                                  "library unavailable")
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "library unavailable")
             return
         self._send_listing(payload)
 
@@ -412,8 +436,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = library.episodes(show)
         except Exception as exc:
             _log(f"reading the video database failed: {exc}", xbmc.LOGWARNING)
-            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE,
-                                  "library unavailable")
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "library unavailable")
             return
         if payload is None:
             # Unknown series: the library changed; the page reloads the shelf.
@@ -435,8 +458,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = library.continuing(films=films, series=series)
         except Exception as exc:
             _log(f"reading the video database failed: {exc}", xbmc.LOGWARNING)
-            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE,
-                                  "library unavailable")
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "library unavailable")
             return
         self._send_listing(payload)
 
@@ -456,11 +478,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.NOT_FOUND, "no such artwork")
             return
         # No library id means the playing title.
-        film    = (query.get("movieid") or [""])[0]
-        show    = (query.get("tvshowid") or [""])[0]
+        film = (query.get("movieid") or [""])[0]
+        show = (query.get("tvshowid") or [""])[0]
         episode = (query.get("episodeid") or [""])[0]
         # The URL carries the picture's tag, so the answer is immutable.
-        tag  = (query.get("v") or [""])[0]
+        tag = (query.get("v") or [""])[0]
         etag = f'"{tag}"' if tag else ""
         cache = artwork.CACHE if tag else "no-store"
         if etag and self._holds(etag):
@@ -480,8 +502,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.NOT_FOUND, "no artwork")
             return
         body, content_type = found
-        self._send(HTTPStatus.OK, body, content_type,
-                   (("ETag", etag),) if etag else (), cache=cache)
+        self._send(
+            HTTPStatus.OK, body, content_type, (("ETag", etag),) if etag else (), cache=cache
+        )
 
     def _serve_static(self, route: str) -> None:
         path, content_type = self.server.static_routes[route]
@@ -493,10 +516,14 @@ class Handler(BaseHTTPRequestHandler):
         if self._holds(etag):
             self._send_unchanged(etag, STATIC_CACHE)
             return
-        extra = (("ETag", etag), ("Vary", "Accept-Encoding"))
+        extra: tuple[tuple[str, str], ...] = (("ETag", etag), ("Vary", "Accept-Encoding"))
         if content_type.startswith("text/html"):
-            extra += (("Content-Security-Policy", page_policy(_PAGE_POLICY,
-                       settings.addon().getSetting("web_dashboard_trust"))),)
+            extra += (
+                (
+                    "Content-Security-Policy",
+                    page_policy(_PAGE_POLICY, settings.addon().getSetting("web_dashboard_trust")),
+                ),
+            )
         if packed is not None and "gzip" in self.headers.get("Accept-Encoding", ""):
             body = packed
             extra += (("Content-Encoding", "gzip"),)
@@ -508,15 +535,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.server.stop_event.is_set():
             # Shutting down: refuse, and tell the page to wait before
             # retrying (see the bye handler in js/core.js).
-            self._send_json({"error": "shutting down", "retry_ms": 20000},
-                            HTTPStatus.SERVICE_UNAVAILABLE)
+            self._send_json(
+                {"error": "shutting down", "retry_ms": 20000}, HTTPStatus.SERVICE_UNAVAILABLE
+            )
             self.close_connection = True
             return
         if not self.server.claim_stream():
             # Slots free up quickly (hidden tabs disconnect, see js/core.js),
             # so the page retries soon.
-            self._send_json({"error": "too many streams"},
-                            HTTPStatus.SERVICE_UNAVAILABLE)
+            self._send_json({"error": "too many streams"}, HTTPStatus.SERVICE_UNAVAILABLE)
             return
         try:
             self.send_response(HTTPStatus.OK)
@@ -542,7 +569,7 @@ class Handler(BaseHTTPRequestHandler):
             producer.unwatch()
 
     def _stream_frames(self, producer: Producer, seen: int) -> None:
-        stop     = self.server.stop_event
+        stop = self.server.stop_event
         # Last payload sent on this connection, the base of the next delta.
         sent: dict | None = None
         last_beat = time.monotonic()
@@ -571,14 +598,13 @@ class Handler(BaseHTTPRequestHandler):
                 kind, frame = "delta", snapshot_delta(sent, payload)
             sent = payload
             data = json.dumps(frame, ensure_ascii=False)
-            self.wfile.write(f"event: {kind}\ndata: {data}\n\n".encode("utf-8"))
+            self.wfile.write(f"event: {kind}\ndata: {data}\n\n".encode())
             self.wfile.flush()
 
         # Parting frame: the page shows "offline" and waits before
         # reconnecting, so it does not hit a server that is going down.
         self.wfile.write(b'event: bye\ndata: {"retry_ms": 20000}\n\n')
         self.wfile.flush()
-
 
     def _serve_jellyfin(self) -> None:
         self._send_json(self.server.jellyfin.sessions())
@@ -612,21 +638,24 @@ class Handler(BaseHTTPRequestHandler):
         # Verify the stored value rather than interpreting its return value.
         addon.setSetting("web_dashboard_trust", value)
         if addon.getSetting("web_dashboard_trust") != value:
-            self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "dashboard setting could not be saved")
+            self._send_error_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR, "dashboard setting could not be saved"
+            )
             return
         self._send_json({"ok": True})
+
 
 # Read routes; they need the token only when reading does.
 _READERS = {
     "/api/jellyfin": Handler._serve_jellyfin,
     "/api/jellyfin/local": Handler._serve_jellyfin_local,
     "/api/jellyfin/art": Handler._serve_jellyfin_art,
-    "/api/state":    Handler._serve_state,
-    "/api/stream":   Handler._serve_stream,
-    "/api/history":  Handler._serve_history,
-    "/api/art":      Handler._serve_art,
-    "/api/library":  Handler._serve_library,
-    "/api/series":   Handler._serve_series,
+    "/api/state": Handler._serve_state,
+    "/api/stream": Handler._serve_stream,
+    "/api/history": Handler._serve_history,
+    "/api/art": Handler._serve_art,
+    "/api/library": Handler._serve_library,
+    "/api/series": Handler._serve_series,
     "/api/episodes": Handler._serve_episodes,
     "/api/continue": Handler._serve_continue,
 }
@@ -634,9 +663,9 @@ _READERS = {
 # Write routes (JSON body); they always need the token and control enabled.
 _WRITERS = {
     "/api/dashboard/trust": Handler._set_dashboard_trust,
-    "/api/mode":    Handler._set_mode,
+    "/api/mode": Handler._set_mode,
     "/api/command": Handler._run_command,
-    "/api/play":    Handler._start_film,
+    "/api/play": Handler._start_film,
     "/api/watched": Handler._mark_watched,
-    "/api/resume":  Handler._clear_resume,
+    "/api/resume": Handler._clear_resume,
 }

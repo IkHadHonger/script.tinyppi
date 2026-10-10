@@ -4,6 +4,7 @@
 """Dashboard artwork: the playing title's poster and fanart, and the shelf
 pictures, read through Kodi's VFS."""
 
+import contextlib
 import os
 import re
 import threading
@@ -11,7 +12,6 @@ from urllib.parse import quote, unquote
 
 import xbmc
 import xbmcvfs
-
 from core.log import channel
 from web.snapshot import art_path
 
@@ -102,14 +102,13 @@ def read_art(path: str) -> bytes | None:
     try:
         handle = xbmcvfs.File(path)
         data = bytes(handle.readBytes(_MAX_ART))
-    except Exception:
+    except Exception as exc:  # the VFS raises RuntimeError or worse for a bad path
+        _log(f"artwork {path} unreadable: {exc}", xbmc.LOGDEBUG)
         return None
     finally:
         if handle is not None:
-            try:
+            with contextlib.suppress(Exception):
                 handle.close()
-            except Exception:
-                pass
     return data or None
 
 

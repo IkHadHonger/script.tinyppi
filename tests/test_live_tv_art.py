@@ -1,8 +1,8 @@
 """Test artwork selection without importing Kodi-only runtime modules."""
 import ast
-from pathlib import Path
 import unittest
 import zlib
+from pathlib import Path
 
 source = Path(__file__).resolve().parents[1] / 'resources/lib/web/snapshot.py'
 tree = ast.parse(source.read_text(encoding='utf-8'))
@@ -17,6 +17,7 @@ class LiveArtTests(unittest.TestCase):
         self.labels = {'Player.Art(poster)': '/art/channel-logo.jpg', 'PVR.EpgEventIcon': '/art/programme-poster.jpg'}
         self.live = True
         self.scope = {'info': lambda key: self.labels.get(key, ''),
+                      'is_live_tv': lambda: self.live,
                       'cond': lambda key: self.live and key == 'PVR.IsPlayingTV', 'zlib': zlib}
         exec(compiled, self.scope)
 

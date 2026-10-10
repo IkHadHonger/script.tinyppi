@@ -1,0 +1,18 @@
+{
+  "name": "script.tinyppi-dev",
+  "private": true,
+  "description": "Development tooling only (lint and tests for the dashboard's scripts); not part of the add-on.",
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "lint": "eslint resources/web/js tests/web tests/browser",
+    "test": "node --test \"tests/web/*.test.mjs\"",
+    "test:browser": "node --test \"tests/browser/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "jsdom": "30.1.2",
+    "playwright": "1.63.0"
+  }
+}

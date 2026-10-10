@@ -1,6 +1,7 @@
 """Infuse source metadata must never masquerade as Apple TV measurements."""
 import json
 import unittest
+
 from test_jellyfin_user import bridge_module
 
 

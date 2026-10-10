@@ -14,12 +14,13 @@ list, highlights changed readings for the highlight duration, and marks
 sections held from earlier frames as ``(Cached)`` (see _paint).
 """
 
+import contextlib
 import threading
 import time
+from typing import Any, TypeVar
 
 import xbmc
 import xbmcgui
-
 from core import settings
 from core.log import log
 from core.utils import (
@@ -146,7 +147,7 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
     keys jump between sections and show as much of each as fits.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._running   = False
         self._monitor   = xbmc.Monitor()
@@ -163,9 +164,9 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
         # Cached static rows, their signature and the next fallback rebuild
         # (owned by _merged_rows).
         self._static_rows: list = []
-        self._static_signature = None
+        self._static_signature: tuple | None = None
         self._next_static_rows = 0.0
-        self._thread         = None
+        self._thread: threading.Thread | None = None
         self._closing        = False
         self._refresh_failed = False
         self._color_missing  = False
@@ -229,7 +230,7 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
     # --- List --------------------------------------------------------------
 
     @staticmethod
-    def _paint(item: xbmcgui.ListItem, row: tuple, label) -> None:
+    def _paint(item: xbmcgui.ListItem, row: tuple, label: str | list[str]) -> None:
         """Make *item* show *row* with *label* as its value.
 
         All rows share one layout (Kodi evaluates list layout conditions once
@@ -246,7 +247,7 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
         compact = table and len(label) == dvmetadata.MAX_COMPACT_COLUMNS
         # Right-align narrow tables in the fixed slots, so the list has one
         # right edge.  All rows of a table have the heading's width (see
-        # dvmetadata._grid and _table), so readings stay under their
+        # dvcomposer._grid and dvmetadata._table), so readings stay under their
         # headings.  Full-width and compact tables are not shifted.
         offset  = (max(0, dvmetadata.MAX_COLUMNS - len(label))
                    if table and not compact else 0)
@@ -316,14 +317,14 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
         labels = [
             value if kind == dvmetadata.SECTION
             else self._highlighter.mark(key, value, color, now)
-            for (kind, _name, value), key in zip(rows, keys)
+            for (kind, _name, value), key in zip(rows, keys, strict=True)
         ]
 
         if keys == self._keys and labels == self._last_labels:
             return
 
         items = []
-        for row, label in zip(rows, labels):
+        for row, label in zip(rows, labels, strict=True):
             item = xbmcgui.ListItem("", "", offscreen=True)
             self._paint(item, row, label)
             items.append(item)
@@ -334,7 +335,7 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
             try:
                 slot    = int(xbmc.getInfoLabel(f"Container({_LIST}).Position"))
                 current = int(xbmc.getInfoLabel(f"Container({_LIST}).CurrentItem")) - 1
-            except Exception:
+            except ValueError:  # empty labels while the list is still empty
                 current = -1
             first_visible = max(0, current - slot) if current >= 0 else 0
             control.reset()
@@ -433,7 +434,7 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
             return self._area_title
         try:
             position = self.getControl(_LIST).getSelectedPosition()
-        except Exception:
+        except Exception:  # window closing: the control is gone
             return self._area_title
         for start, title, end in self._areas:
             if start <= position <= end:
@@ -482,10 +483,8 @@ class DVMetadataDialog(xbmcgui.WindowXMLDialog):
         self._closing       = True
         self.back_to_caller = back_to_caller
         self._running       = False
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
     # --- Refresh -----------------------------------------------------------
 
@@ -531,7 +530,7 @@ class DVSectionDialog(DVMetadataDialog):
     arrow keys scroll by rows.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Set before doModal(): the section title to show.
         self.section     = ""
@@ -570,7 +569,11 @@ class DVSectionDialog(DVMetadataDialog):
             self._close(back_to_caller=False)
 
 
-def _dialog(dialog_class):
+_Dialog = TypeVar("_Dialog", bound=xbmcgui.WindowXMLDialog)
+
+
+def _dialog(dialog_class: type[_Dialog]) -> _Dialog:
+
     """Create a *dialog_class* window from the metadata skin file."""
     return dialog_class(
         "script-tinyppi-dv-metadata.xml",

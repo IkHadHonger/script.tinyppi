@@ -5,13 +5,16 @@
 import json
 import threading
 import time
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-import xbmcvfs
 import xbmcaddon
+import xbmcvfs
 
+# Raw Jellyfin JSON values are validated by the consuming helper.
+Unchecked = Any
 
 _CREDENTIALS = "special://profile/addon_data/plugin.video.jellyfin/data.json"
 _SESSION_TTL = 2.0
@@ -19,18 +22,18 @@ _ITEM_TTL = 60.0
 _TIMEOUT = 4.0
 
 
-def _text(value) -> str:
+def _text(value: object) -> str:
     return "" if value is None else str(value)
 
 
-def _number(value, default=0):
+def _number(value: Unchecked, default: float = 0) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
 
 
-def _ticks(value) -> float:
+def _ticks(value: Unchecked) -> float:
     return _number(value) / 10_000_000.0
 
 
@@ -38,13 +41,12 @@ def _clock(seconds: float) -> str:
     seconds = max(0, int(seconds or 0))
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    return (f"{hours}:{minutes:02d}:{seconds:02d}" if hours
-            else f"{minutes}:{seconds:02d}")
+    return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
 
 
-def _first_stream(streams, kind: str, index=None, strict=False) -> dict:
-    candidates = [stream for stream in streams
-                  if _text(stream.get("Type")).lower() == kind.lower()]
+def _first_stream(streams: list[dict], kind: str, index: Unchecked = None,
+                  strict: bool = False) -> dict:
+    candidates = [stream for stream in streams if _text(stream.get("Type")).lower() == kind.lower()]
     if index is not None:
         for stream in candidates:
             if stream.get("Index") == index:
@@ -76,8 +78,7 @@ def _dv_detail(item: dict, video: dict) -> str:
             return "Profile 7 (MEL)"
         return "Profile 7"
     if profile is not None:
-        suffix = (f".{compatibility}" if profile == 8 and compatibility is not None
-                  else "")
+        suffix = f".{compatibility}" if profile == 8 and compatibility is not None else ""
         return f"Profile {profile}{suffix}"
     return ""
 
@@ -101,12 +102,20 @@ def _infuse_output(session: dict, video: dict, transcode: dict) -> dict:
     device = _text(session.get("DeviceName")).lower().replace(" ", "")
     apple_tv = "appletv" in device or "tvos" in device
     profile = video.get("DvProfile")
-    hdr10_base = (video.get("DvBlSignalCompatibilityId") == 1 or
-                  "hdr10" in _text(video.get("VideoRangeType")).lower())
-    expected = ("HDR10-fallback verwacht" if hdr10_base else
-                "HDR10-fallback mogelijk") if apple_tv and profile == 7 and not transcode else "Niet gemeld"
-    return {"expected": expected, "confirmed": False,
-            "basis": "Bronbestand en apparaatnaam; geen uitvoermeting"}
+    hdr10_base = (
+        video.get("DvBlSignalCompatibilityId") == 1
+        or "hdr10" in _text(video.get("VideoRangeType")).lower()
+    )
+    expected = (
+        ("HDR10-fallback verwacht" if hdr10_base else "HDR10-fallback mogelijk")
+        if apple_tv and profile == 7 and not transcode
+        else "Niet gemeld"
+    )
+    return {
+        "expected": expected,
+        "confirmed": False,
+        "basis": "Bronbestand en apparaatnaam; geen uitvoermeting",
+    }
 
 
 class JellyfinBridge:
@@ -116,9 +125,9 @@ class JellyfinBridge:
         self._lock = threading.Lock()
         self._sessions_at = 0.0
         self._sessions = {"available": False, "sessions": []}
-        self._items = {}
+        self._items: dict = {}
         self._local_at = 0.0
-        self._local = {}
+        self._local: dict = {}
 
     @staticmethod
     def _connection() -> dict:
@@ -129,8 +138,12 @@ class JellyfinBridge:
         except (OSError, ValueError, TypeError):
             return {}
         for server in data.get("Servers") or []:
-            address = (server.get("address") or server.get("ManualAddress")
-                       or server.get("LocalAddress") or server.get("RemoteAddress"))
+            address = (
+                server.get("address")
+                or server.get("ManualAddress")
+                or server.get("LocalAddress")
+                or server.get("RemoteAddress")
+            )
             token = server.get("AccessToken")
             if address and token:
                 return {
@@ -142,18 +155,21 @@ class JellyfinBridge:
         return {}
 
     @staticmethod
-    def _request(connection: dict, path: str, binary: bool = False):
+    def _request(connection: dict, path: str, binary: bool = False) -> Unchecked:
         # Match the authenticated header used by Jellyfin for Kodi. Include
         # Token in Authorization rather than a tokenless authorization header
         # alongside a separate token header (some servers prioritize the former).
         authorization = (
             'MediaBrowser Client="TinyPPI", Device="CoreELEC", '
-            'DeviceId="tinyppi-dashboard", Version="2.15.4", Token="{}"'
+            'DeviceId="tinyppi-dashboard", Version="2.15.5", Token="{}"'
         ).format(quote(connection["token"], safe=""))
-        request = Request(connection["address"] + path, headers={
-            "Accept": "image/*" if binary else "application/json",
-            "Authorization": authorization,
-        })
+        request = Request(
+            connection["address"] + path,
+            headers={
+                "Accept": "image/*" if binary else "application/json",
+                "Authorization": authorization,
+            },
+        )
         with urlopen(request, timeout=_TIMEOUT) as response:
             body = response.read()
             if binary:
@@ -161,7 +177,7 @@ class JellyfinBridge:
             return json.loads(body.decode("utf-8"))
 
     @staticmethod
-    def _failure(exc) -> dict:
+    def _failure(exc: Exception) -> dict:
         # Never return exception text: it can contain URLs or credentials.
         if isinstance(exc, HTTPError):
             return {"reason": "jellyfin_http_error", "http_status": exc.code}
@@ -182,8 +198,11 @@ class JellyfinBridge:
                 return dict(self._local)
             connection = self._connection()
             if not connection:
-                result = {"available": False, "user": "",
-                          "reason": "jellyfin_for_kodi_not_configured"}
+                result = {
+                    "available": False,
+                    "user": "",
+                    "reason": "jellyfin_for_kodi_not_configured",
+                }
             else:
                 try:
                     addon = xbmcaddon.Addon("plugin.video.jellyfin")
@@ -194,29 +213,37 @@ class JellyfinBridge:
                     guid_path = xbmcvfs.translatePath(
                         "special://profile/addon_data/plugin.video.jellyfin/jellyfin_guid"
                     )
-                    with open(guid_path, "r", encoding="utf-8") as handle:
+                    with open(guid_path, encoding="utf-8") as handle:
                         device_id = handle.read().strip()
                 except OSError:
                     device_id = ""
-                result = {"available": True, "user": username,
-                          "source": "configured", "linked": False}
+                result = {
+                    "available": True,
+                    "user": username,
+                    "source": "configured",
+                    "linked": False,
+                }
                 try:
                     if device_id:
-                        raw = self._request(connection, "/Sessions?" +
-                                            urlencode({"DeviceId": device_id}))
+                        raw = self._request(
+                            connection, "/Sessions?" + urlencode({"DeviceId": device_id})
+                        )
                         if not isinstance(raw, list):
                             raise ValueError("invalid sessions")
-                        matches = [session for session in raw
-                                   if session.get("DeviceId") == device_id
-                                   and (not connection.get("user_id") or
-                                        session.get("UserId") == connection["user_id"])
-                                   and session.get("UserName")]
-                        playing = [session for session in matches
-                                   if session.get("NowPlayingItem")]
+                        matches = [
+                            session
+                            for session in raw
+                            if session.get("DeviceId") == device_id
+                            and (
+                                not connection.get("user_id")
+                                or session.get("UserId") == connection["user_id"]
+                            )
+                            and session.get("UserName")
+                        ]
+                        playing = [session for session in matches if session.get("NowPlayingItem")]
                         match = (playing or matches or [None])[0]
                         if match:
-                            result.update(user=match["UserName"], source="session",
-                                          linked=True)
+                            result.update(user=match["UserName"], source="session", linked=True)
                     if not result["linked"]:
                         user = self._request(connection, "/Users/Me")
                         if isinstance(user, dict) and user.get("Name"):
@@ -242,7 +269,7 @@ class JellyfinBridge:
         try:
             detailed = self._request(
                 connection,
-                "/Users/{}/Items/{}?{}".format(quote(user_id), quote(item_id), params),
+                f"/Users/{quote(user_id)}/Items/{quote(item_id)}?{params}",
             )
         except (HTTPError, URLError, OSError, ValueError):
             return item
@@ -256,22 +283,32 @@ class JellyfinBridge:
                 return self._sessions
             connection = self._connection()
             if not connection:
-                result = {"available": False, "sessions": [],
-                          "reason": "jellyfin_for_kodi_not_configured"}
+                result = {
+                    "available": False,
+                    "sessions": [],
+                    "reason": "jellyfin_for_kodi_not_configured",
+                }
             else:
                 try:
                     raw = self._request(connection, "/Sessions?ActiveWithinSeconds=90")
-                    active = [self._session(connection, session) for session in raw
-                              if session.get("NowPlayingItem")]
-                    active.sort(key=lambda value: (
-                        value.get("user", "").lower(),
-                        value.get("device", "").lower(),
-                    ))
-                    result = {"available": True, "server": connection.get("name", ""),
-                              "sessions": active}
+                    active = [
+                        self._session(connection, session)
+                        for session in raw
+                        if session.get("NowPlayingItem")
+                    ]
+                    active.sort(
+                        key=lambda value: (
+                            value.get("user", "").lower(),
+                            value.get("device", "").lower(),
+                        )
+                    )
+                    result = {
+                        "available": True,
+                        "server": connection.get("name", ""),
+                        "sessions": active,
+                    }
                 except (HTTPError, URLError, OSError, ValueError, TypeError) as exc:
-                    result = {"available": True, "sessions": [],
-                              **self._failure(exc)}
+                    result = {"available": True, "sessions": [], **self._failure(exc)}
             self._sessions_at = now
             self._sessions = result
             return result
@@ -298,17 +335,23 @@ class JellyfinBridge:
         episode_number = item.get("IndexNumber", base_item.get("IndexNumber"))
         episode = ""
         if series:
-            episode = "S{:02d}E{:02d}".format(int(season_number or 0), int(episode_number or 0))
+            episode = f"S{int(season_number or 0):02d}E{int(episode_number or 0):02d}"
 
-        image_item = (_text(item.get("SeriesId")) if series else _text(item.get("Id")))
+        image_item = _text(item.get("SeriesId")) if series else _text(item.get("Id"))
         if not image_item:
             image_item = _text(base_item.get("Id"))
-        backdrop_item = (_text(item.get("ParentBackdropItemId")) or
-                         _text(item.get("SeriesId")) or _text(item.get("Id")))
+        backdrop_item = (
+            _text(item.get("ParentBackdropItemId"))
+            or _text(item.get("SeriesId"))
+            or _text(item.get("Id"))
+        )
 
         bitrate = transcode.get("Bitrate") or video.get("BitRate") or item.get("Bitrate")
-        framerate = (transcode.get("Framerate") or video.get("RealFrameRate")
-                     or video.get("AverageFrameRate"))
+        framerate = (
+            transcode.get("Framerate")
+            or video.get("RealFrameRate")
+            or video.get("AverageFrameRate")
+        )
         reasons = transcode.get("TranscodeReasons") or []
         if isinstance(reasons, str):
             reasons = [part.strip() for part in reasons.split(",") if part.strip()]
@@ -340,7 +383,9 @@ class JellyfinBridge:
                 "bit_depth": video.get("BitDepth"),
                 "frame_rate": framerate,
                 "range": _hdr_label(item, video),
-                "direct": bool(transcode.get("IsVideoDirect")) if transcode else method != "Transcode",
+                "direct": bool(transcode.get("IsVideoDirect"))
+                if transcode
+                else method != "Transcode",
             },
             "audio": {
                 "codec": _text(transcode.get("AudioCodec") or audio.get("Codec")),
@@ -349,7 +394,9 @@ class JellyfinBridge:
                 "title": _text(audio.get("DisplayTitle") or audio.get("Title")),
                 "sample_rate": audio.get("SampleRate"),
                 "bitrate": audio.get("BitRate"),
-                "direct": bool(transcode.get("IsAudioDirect")) if transcode else method != "Transcode",
+                "direct": bool(transcode.get("IsAudioDirect"))
+                if transcode
+                else method != "Transcode",
             },
             "subtitle": {
                 "codec": _text(subtitle.get("Codec")),
@@ -367,17 +414,23 @@ class JellyfinBridge:
             # output, decoder, thermal or dropped-frame measurements.
             sources = item.get("MediaSources") or []
             source_id = state.get("MediaSourceId")
-            source = next((entry for entry in sources
-                           if source_id and entry.get("Id") == source_id), {})
+            source: dict = next(
+                (entry for entry in sources if source_id and entry.get("Id") == source_id), {}
+            )
             if not source_id and len(sources) == 1:
                 source = sources[0]
             ambiguous_source = bool(sources) and not source
             source_streams = (source.get("MediaStreams") or streams) if not ambiguous_source else []
             source_video = _first_stream(source_streams, "Video")
-            source_audio = _first_stream(source_streams, "Audio", state.get("AudioStreamIndex"), strict=True)
+            source_audio = _first_stream(
+                source_streams, "Audio", state.get("AudioStreamIndex"), strict=True
+            )
             subtitle_index = state.get("SubtitleStreamIndex")
-            source_subtitle = (_first_stream(source_streams, "Subtitle", subtitle_index, strict=True)
-                               if isinstance(subtitle_index, int) and subtitle_index >= 0 else {})
+            source_subtitle = (
+                _first_stream(source_streams, "Subtitle", subtitle_index, strict=True)
+                if isinstance(subtitle_index, int) and subtitle_index >= 0
+                else {}
+            )
             reported_method = _text(session.get("PlayMethod") or state.get("PlayMethod"))
             result["method"] = reported_method or ("Transcode" if transcode else "Unknown")
             result["infuse"] = {
@@ -385,15 +438,22 @@ class JellyfinBridge:
                     "codec": _text(source_video.get("Codec")),
                     "width": source_video.get("Width"),
                     "height": source_video.get("Height"),
-                    "frame_rate": source_video.get("RealFrameRate") or source_video.get("AverageFrameRate"),
+                    "frame_rate": source_video.get("RealFrameRate")
+                    or source_video.get("AverageFrameRate"),
                     "bit_depth": source_video.get("BitDepth"),
                     "range": _hdr_label(item, source_video),
-                    "bitrate": source.get("Bitrate") or (item.get("Bitrate") if not ambiguous_source else None),
-                    "container": _text(source.get("Container") or (item.get("Container") if not ambiguous_source else "")),
+                    "bitrate": source.get("Bitrate")
+                    or (item.get("Bitrate") if not ambiguous_source else None),
+                    "container": _text(
+                        source.get("Container")
+                        or (item.get("Container") if not ambiguous_source else "")
+                    ),
                     "audio_codec": _text(source_audio.get("Codec")),
                     "audio_channels": _channel_label(source_audio),
                     "audio_language": _text(source_audio.get("Language")),
-                    "subtitle": _text(source_subtitle.get("DisplayTitle") or source_subtitle.get("Language")),
+                    "subtitle": _text(
+                        source_subtitle.get("DisplayTitle") or source_subtitle.get("Language")
+                    ),
                 },
                 "session": {
                     "audio_index": state.get("AudioStreamIndex"),
@@ -416,7 +476,7 @@ class JellyfinBridge:
             }
         return result
 
-    def artwork(self, item_id: str, kind: str):
+    def artwork(self, item_id: str, kind: str) -> tuple[bytes, str] | None:
         connection = self._connection()
         if not connection or not item_id or kind not in ("primary", "backdrop"):
             return None
@@ -429,4 +489,3 @@ class JellyfinBridge:
             return self._request(connection, path, binary=True)
         except (HTTPError, URLError, OSError):
             return None
-

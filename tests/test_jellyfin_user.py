@@ -2,10 +2,10 @@
 """Verify that a local card never adopts another device's Jellyfin user."""
 import importlib.util
 import io
-from pathlib import Path
 import sys
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 

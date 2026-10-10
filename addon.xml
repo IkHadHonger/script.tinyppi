@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="script.tinyppi" name="TinyPPI" version="2.15.4" provider-name="jamal2362, IkHadHonger">
+<addon id="script.tinyppi" name="TinyPPI" version="2.15.5" provider-name="jamal2362, IkHadHonger">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
         <import addon="script.module.sidedata" version="1.6.0"/>
@@ -23,7 +23,11 @@
         <description lang="hu">Megnyit egy külön folyamatinformációs ablakot. Ez az ablak az aktuálisan lejátszott média kodek-, videó- és hangadatait jeleníti meg.</description>
         <description lang="zh">打开一个独立的进程信息窗口。此窗口显示当前播放媒体的编解码器、视频和音频详细信息。</description>
         <!-- The latest version only: replace this entry on every version bump. -->
-        <news>v2.15.4 (Jellyfin fork)
+        <news>v2.15.5 (Jellyfin fork)
+- Merge reviewed upstream refactoring, IPv6 support and additional tests.
+- Preserve Jellyfin, multi-box dashboards, Safari startup and programme artwork.
+
+v2.15.4 (Jellyfin fork)
 - Log the first refused dashboard connection even immediately after boot, keeping connection limits and warning throttling unchanged.
 
 v2.15.3 (Jellyfin fork)

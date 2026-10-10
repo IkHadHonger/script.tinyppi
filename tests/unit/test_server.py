@@ -7,61 +7,13 @@ import json
 import socket
 import threading
 import time
-import urllib.error
-import urllib.request
 from types import SimpleNamespace
 
 import pytest
 
 import xbmc
+from dashboard_server import DIRECT, TOKEN, IdleProducer, request
 from web import server as web_server
-
-TOKEN = "TESTTK23"
-
-
-class IdleProducer:
-    """A producer with nothing playing (no thread)."""
-
-    def fresh(self):
-        return {"seq": 1, "playing": False, "groups": [], "metrics": {}, "library": 0}
-
-    def history(self):
-        return {"t": [], "events": []}
-
-
-@pytest.fixture
-def dashboard():
-    stop = threading.Event()
-    srv = web_server._Server(("127.0.0.1", 0), IdleProducer(), stop, TOKEN)
-    srv.refresh_settings()
-    thread = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
-    thread.start()
-    yield srv
-    stop.set()
-    srv.shutdown()
-    srv.server_close()
-    srv.close_connections()
-    srv.join_workers(2)
-
-
-_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-
-
-def request(srv, path, method="GET", body=None, token=None, host=None):
-    port = srv.server_address[1]
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method=method)
-    if data is not None:
-        req.add_header("Content-Type", "application/json")
-    if token:
-        req.add_header("X-TinyPPI-Token", token)
-    if host:
-        req.add_header("Host", host)
-    try:
-        with _DIRECT.open(req, timeout=5) as resp:
-            return resp.status, dict(resp.headers), resp.read()
-    except urllib.error.HTTPError as err:
-        return err.code, dict(err.headers), err.read()
 
 
 def test_page_and_static_files(dashboard):
@@ -130,7 +82,7 @@ def test_one_address_holds_at_most_16_connections(dashboard):
             try:
                 if sock.recv(1) == b"":
                     refused += 1
-            except socket.timeout:
+            except TimeoutError:
                 pass
             except ConnectionResetError:
                 refused += 1
@@ -161,8 +113,9 @@ def test_first_refusal_is_logged_at_any_uptime_and_repeats_are_throttled(monkeyp
     srv = web_server._Server(("127.0.0.1", 0), IdleProducer(), threading.Event(), TOKEN)
     try:
         srv._connections = {object(): "127.0.0.1" for _ in range(16)}
-        refusals = lambda: [message for _level, message in xbmc.LOG
-                            if "refusing a connection" in message]
+        def refusals():
+            return [message for _level, message in xbmc.LOG
+                    if "refusing a connection" in message]
         assert srv.verify_request(None, ("127.0.0.1", 1)) is False
         assert len(refusals()) == 1
         now = uptime + 59.0
@@ -175,3 +128,35 @@ def test_first_refusal_is_logged_at_any_uptime_and_repeats_are_throttled(monkeyp
         assert srv.verify_request(None, ("127.0.0.1", 4)) is True
     finally:
         srv.server_close()
+
+
+def _ipv6_loopback() -> bool:
+    if not socket.has_ipv6:
+        return False
+    try:
+        with socket.socket(socket.AF_INET6) as probe:
+            probe.bind(("::1", 0))
+    except OSError:
+        return False
+    return True
+
+
+@pytest.mark.skipif(not _ipv6_loopback(), reason="no IPv6 on this machine")
+def test_the_dashboard_answers_over_ipv6_and_ipv4():
+    stop = threading.Event()
+    srv = web_server._bind(0, IdleProducer(), stop, TOKEN)
+    assert isinstance(srv, web_server._DualStackServer)
+    srv.refresh_settings()
+    thread = threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+    thread.start()
+    try:
+        port = srv.server_address[1]
+        for host in ("127.0.0.1", "[::1]"):
+            with DIRECT.open(f"http://{host}:{port}/api/hello", timeout=5) as resp:
+                assert resp.status == 200
+    finally:
+        stop.set()
+        srv.shutdown()
+        srv.server_close()
+        srv.close_connections()
+        srv.join_workers(2)

@@ -1,6 +1,6 @@
 import importlib.util
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 path = Path(__file__).resolve().parents[1] / 'resources/lib/web/dashboard_trust.py'
 spec = importlib.util.spec_from_file_location('dashboard_trust', path)
