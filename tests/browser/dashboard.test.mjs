@@ -55,7 +55,12 @@ after(async () => {
   server?.kill();
 });
 
-const tab = (name) => page.click(`.tab[data-tab="${name}"]`);
+const tab = async (name) => {
+  // A slow first connection can outlast the navigation's idle timer.
+  // Wake it through real input, just as a user would; do not force clicks.
+  await page.keyboard.press("Shift");
+  await page.click(`.tab[data-tab="${name}"]`);
+};
 const texts = (selector) => page.locator(selector).allInnerTexts();
 
 test("the live tab connects and shows the format badges", async () => {
