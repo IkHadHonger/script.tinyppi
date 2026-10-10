@@ -4,6 +4,7 @@
 """The language codes of the audio and subtitle rows."""
 
 import pytest
+
 import xbmc
 
 
@@ -21,6 +22,8 @@ def test_subtitle_short_code(code, short):
 
 @pytest.mark.parametrize("code, short", [
     ("eng", "ENG"),
+    ("fre", "FRA"),
+    ("chi", "ZHO"),
     ("xyz", "XYZ"),
     ("", "UNK"),
 ])
@@ -29,6 +32,14 @@ def test_audio_short_code(code, short):
     xbmc.INFO["VideoPlayer.AudioCodec"] = "dtshd_ma"
     xbmc.INFO["VideoPlayer.AudioLanguage"] = code
     assert properties.get_AudioNameShortVar() == short
+
+
+@pytest.mark.parametrize("code, name", [("ger", "Deutsch"), ("abk", "Apsua"), ("xyz", "")])
+def test_audio_native_name(code, name):
+    from info import properties
+    xbmc.INFO["VideoPlayer.AudioCodec"] = "dtshd_ma"
+    xbmc.INFO["VideoPlayer.AudioLanguage"] = code
+    assert properties.get_AudioNameVar() == name
 
 
 def test_audio_short_code_without_audio():

@@ -11,7 +11,6 @@ import threading
 import time
 
 import xbmc
-
 from core import settings
 from core.log import channel
 from web import library
@@ -150,6 +149,8 @@ class Producer(threading.Thread):
             metadata=addon.getSetting("web_metadata") == "true",
             control=addon.getSetting("web_allow_control") == "true",
         )
+        if snapshot is None:  # only built without detail, never here
+            return
         # The library revision rides along so open pages learn about changes
         # (e.g. a film now watched).  Reading it also runs deferred drops; this
         # thread is the add-on's clock (see ``library.revision``).

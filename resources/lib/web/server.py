@@ -4,12 +4,13 @@
 """The dashboard's HTTP server and its lifecycle.
 
 A producer thread builds snapshots that are pushed to every browser via
-Server-Sent Events (web/producer.py).  Routes live in web/routes.py, delta
-frames in web/delta.py, artwork in web/artwork.py and the page's files in
-web/static.py.  Routes are a fixed table, never a filesystem lookup; every
+Server-Sent Events (web/producer.py, built by web/snapshot.py).  Routes live
+in web/routes.py, delta frames in web/delta.py, artwork in web/artwork.py and
+the page's files in web/static.py.  Routes are a fixed table, never a filesystem lookup; every
 state change needs the token.  The server is off unless enabled.
 """
 
+import contextlib
 import secrets
 import socket
 import sys
@@ -20,7 +21,6 @@ from http.server import ThreadingHTTPServer
 
 import xbmc
 import xbmcaddon
-
 from core import settings
 from core.log import channel
 from web import access, artwork, library, static
@@ -59,6 +59,10 @@ _DEFAULT_PORT = 8099
 
 _log = channel("web", xbmc.LOGINFO)
 
+# What socketserver hands the request hooks (a TCP server only sees sockets).
+_Request = socket.socket | tuple[bytes, socket.socket]
+
+
 
 # --- Settings --------------------------------------------------------------
 
@@ -67,7 +71,7 @@ def _addon() -> xbmcaddon.Addon:
     return settings.addon()
 
 
-def ensure_token(addon=None) -> str:
+def ensure_token(addon: xbmcaddon.Addon | None = None) -> str:
     """Return the access token, generating one when none exists yet."""
     addon = addon or _addon()
     token = (addon.getSetting("web_token") or "").strip()
@@ -76,7 +80,7 @@ def ensure_token(addon=None) -> str:
     return token
 
 
-def generate_token(addon=None) -> str:
+def generate_token(addon: xbmcaddon.Addon | None = None) -> str:
     """Generate and store a new token, invalidating the old one."""
     addon = addon or _addon()
     token = "".join(secrets.choice(_TOKEN_ALPHABET) for _ in range(_TOKEN_LENGTH))
@@ -84,7 +88,7 @@ def generate_token(addon=None) -> str:
     return token
 
 
-def configured_port(addon=None) -> int:
+def configured_port(addon: xbmcaddon.Addon | None = None) -> int:
     """Return the configured port, or the default outside 1024-65535."""
     addon = addon or _addon()
     try:
@@ -123,7 +127,7 @@ class _Server(ThreadingHTTPServer):
     daemon_threads      = True
     allow_reuse_address = True
 
-    def __init__(self, address, producer: Producer, stop_event: threading.Event,
+    def __init__(self, address: tuple[str, int], producer: Producer, stop_event: threading.Event,
                  token: str) -> None:
         super().__init__(address, Handler)
         self.producer      = producer
@@ -141,16 +145,18 @@ class _Server(ThreadingHTTPServer):
         self._stream_lock  = threading.Lock()
         # Request threads, joined in stop(): Kodi waits for every thread of
         # the interpreter, daemon or not.
-        self._workers      = set()
+        self._workers: set[threading.Thread] = set()
         self._worker_lock  = threading.Lock()
         # Open connections and their addresses, so stop() can hang up on
         # idle keep-alives and verify_request() can cap them.
         self._connections: dict = {}
-        self._refusal_logged = 0.0
+        # monotonic() counts from boot, and Kodi starts seconds after it:
+        # 0.0 would hide every refusal in the first minute.
+        self._refusal_logged = float("-inf")
         # Cached poster and fanart of the playing title.
         self._art = artwork.PlayingArtwork()
 
-    def verify_request(self, request, client_address) -> bool:
+    def verify_request(self, request: _Request, client_address: tuple[str, int]) -> bool:
         """Refuse connections once shutdown has begun or over the caps.
 
         Checked before a thread is started, so reconnecting pages cannot
@@ -159,7 +165,7 @@ class _Server(ThreadingHTTPServer):
         """
         if self.stop_event.is_set():
             return False
-        address = client_address[0]
+        address = access.client_key(client_address[0])
         with self._worker_lock:
             total = len(self._connections)
             mine = sum(1 for held in self._connections.values()
@@ -175,14 +181,14 @@ class _Server(ThreadingHTTPServer):
                  f"{total} in all", xbmc.LOGWARNING)
         return False
 
-    def process_request(self, request, client_address) -> None:
+    def process_request(self, request: _Request, client_address: tuple[str, int]) -> None:
         # Registered on the accept loop, so the table is complete once
         # shutdown() has returned.
         with self._worker_lock:
-            self._connections[request] = client_address[0]
+            self._connections[request] = access.client_key(client_address[0])
         super().process_request(request, client_address)
 
-    def shutdown_request(self, request) -> None:
+    def shutdown_request(self, request: _Request) -> None:
         # Removed under the lock before closing, so close_connections()
         # never touches a closed socket.
         with self._worker_lock:
@@ -200,13 +206,11 @@ class _Server(ThreadingHTTPServer):
         with self._worker_lock:
             connections = list(self._connections)
             for connection in connections:
-                try:
+                with contextlib.suppress(OSError):
                     connection.shutdown(how)
-                except OSError:
-                    pass
         return len(connections)
 
-    def process_request_thread(self, request, client_address) -> None:
+    def process_request_thread(self, request: _Request, client_address: tuple[str, int]) -> None:
         worker = threading.current_thread()
         with self._worker_lock:
             self._workers.add(worker)
@@ -228,7 +232,7 @@ class _Server(ThreadingHTTPServer):
             worker.join(remaining)
         return sum(1 for worker in workers if worker.is_alive())
 
-    def refresh_settings(self, addon=None) -> None:
+    def refresh_settings(self, addon: xbmcaddon.Addon | None = None) -> None:
         """Re-read the request-related settings without a restart."""
         addon = addon or _addon()
         self.auth_read     = addon.getSetting("web_auth_read") == "true"
@@ -285,14 +289,39 @@ class _Server(ThreadingHTTPServer):
         with self._stream_lock:
             self._streams = max(0, self._streams - 1)
 
-    def handle_error(self, request, client_address) -> None:
+    def handle_error(self, request: _Request, client_address: tuple[str, int]) -> None:
         """Log request errors: hang-ups at debug, real faults with traceback."""
         exc = sys.exc_info()[1]
         if isinstance(exc, (BrokenPipeError, ConnectionResetError, TimeoutError)):
-            _log(f"connection from {client_address[0]} ended early", xbmc.LOGDEBUG)
+            _log(f"connection from {access.plain_address(client_address[0])} ended early",
+                 xbmc.LOGDEBUG)
             return
-        _log(f"request from {client_address[0]} failed:\n"
+        _log(f"request from {access.plain_address(client_address[0])} failed:\n"
              f"{traceback.format_exc()}", xbmc.LOGERROR)
+
+
+class _DualStackServer(_Server):
+    """The server on one IPv6 socket that also accepts IPv4 clients.
+
+    Binding fails, and the caller falls back to IPv4 only, where IPv6 is
+    off or the socket cannot be opened for IPv4 too.
+    """
+
+    address_family = socket.AF_INET6
+
+    def server_bind(self) -> None:
+        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
+
+
+def _bind(port: int, producer: Producer, stop: threading.Event, token: str) -> _Server:
+    """Return a server listening on *port* over IPv6 and IPv4, or IPv4 only."""
+    if socket.has_ipv6:
+        try:
+            return _DualStackServer(("::", port), producer, stop, token)
+        except OSError as exc:
+            _log(f"IPv6 unavailable ({exc}), listening on IPv4 only", xbmc.LOGDEBUG)
+    return _Server(("0.0.0.0", port), producer, stop, token)
 
 
 class WebDashboard:
@@ -350,7 +379,7 @@ class WebDashboard:
         self._stop     = threading.Event()
         self._producer = Producer(self._stop)
         try:
-            server = _Server(("0.0.0.0", port), self._producer, self._stop, token)
+            server = _bind(port, self._producer, self._stop, token)
         except OSError as exc:
             _log(f"cannot bind port {port}: {exc}", xbmc.LOGERROR)
             self._stop = None

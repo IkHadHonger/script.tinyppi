@@ -14,6 +14,7 @@ changes.  ``prune_cache`` removes copies that can no longer be requested.
 """
 
 import binascii
+import contextlib
 import hashlib
 import math
 import os
@@ -25,7 +26,6 @@ import zlib
 
 import xbmc
 import xbmcvfs
-
 from core.constants import PROFILE_DIR
 from core.files import atomic_write
 from core.log import channel
@@ -36,7 +36,7 @@ _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 # Part of every content key.  Raise it whenever the scaler's output changes,
 # so older textures stop matching (and prune_cache removes them).
-_SCALER_VERSION = b"1"
+_SCALER_VERSION = b"2"
 
 # ``<source name>_<width>x<height>_<content key>.png``; anything else in the
 # cache was left by an older version or an interrupted build.
@@ -85,17 +85,15 @@ _log = channel("images")
 
 
 def _log_debug(message: str) -> None:
-    try:
+    with contextlib.suppress(Exception):
         _log(message)
-    except Exception:
-        pass
 
 
 def _png_dimensions(path: str) -> tuple[int, int]:
     try:
         with open(path, "rb") as handle:
             header = handle.read(24)
-    except Exception:
+    except OSError:
         return (0, 0)
     if len(header) < 24 or not header.startswith(_PNG_SIGNATURE):
         return (0, 0)
@@ -213,8 +211,8 @@ def _decode_png_rgba(path: str) -> tuple[int, int, list[tuple[int, int, int, int
                 raise ValueError("unsupported PNG format")
         elif kind == b"PLTE":
             palette = [
-                tuple(payload[i:i + 3])
-                for i in range(0, len(payload), 3)
+                (payload[i], payload[i + 1], payload[i + 2])
+                for i in range(0, len(payload) - 2, 3)
             ]
         elif kind == b"tRNS":
             transparency = payload
@@ -313,7 +311,7 @@ def _resize_horizontal(
     src_w: int, src_h: int, dst_w: int,
 ) -> list[tuple[float, float, float, float]]:
     taps = _box_taps(src_w, dst_w)
-    resized = []
+    resized: list[tuple[float, float, float, float]] = []
     append = resized.append
     for y in range(src_h):
         _breathe(y)
@@ -335,7 +333,7 @@ def _resize_vertical(
     pixels: list[tuple[float, float, float, float]],
     src_w: int, src_h: int, dst_h: int,
 ) -> list[tuple[float, float, float, float]]:
-    resized = []
+    resized: list[tuple[float, float, float, float]] = []
     append = resized.append
     for y, (start, weights) in enumerate(_box_taps(src_h, dst_h)):
         _breathe(y)
@@ -366,10 +364,13 @@ def _unpremultiply_rgba(
         if alpha == 0:
             rgba.extend((0, 0, 0, 0))
         else:
+            # Divided by the exact coverage, not the rounded byte: a half
+            # covered white edge would otherwise come out as 254.
+            scale = 255.0 / a
             rgba.extend((
-                _clamp_byte(r * 255.0 / alpha),
-                _clamp_byte(g * 255.0 / alpha),
-                _clamp_byte(b * 255.0 / alpha),
+                _clamp_byte(r * scale),
+                _clamp_byte(g * scale),
+                _clamp_byte(b * scale),
                 alpha,
             ))
     return bytes(rgba)
@@ -408,7 +409,7 @@ def _scale_png_for_display(src_path: str, dst_path: str, dst_w: int, dst_h: int)
     _write_png_rgba(dst_path, dst_w, dst_h, _unpremultiply_rgba(resized))
 
 
-def _cache_target(path: str, box_w: int, box_h: int):
+def _cache_target(path: str, box_w: int, box_h: int) -> tuple[str, int, int] | None:
     """Return ``(cache_path, dst_w, dst_h)`` for a texture worth scaling.
 
     None when the source can be used as is: not a PNG, unreadable, or already
@@ -525,9 +526,7 @@ def _current_keys(stem: str, sources: dict, current: dict) -> set[str]:
     if keys is None:
         keys = set()
         for path in sources.get(stem, ()):
-            try:
+            with contextlib.suppress(OSError):
                 keys.add(_content_key(path))
-            except OSError:
-                pass
         current[stem] = keys
     return keys
