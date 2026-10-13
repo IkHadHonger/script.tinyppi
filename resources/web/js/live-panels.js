@@ -233,12 +233,12 @@
     posterTag = tag;
     if (!tag) {
       el.artBox.classList.add("hidden");
-      el.poster.removeAttribute("src");
+      (TinyPPI.loadArtwork || ((image) => image.removeAttribute("src")))(el.poster, "");
       tint("");
       return;
     }
     const url = "/api/art?kind=poster&v=" + tag;
-    el.poster.src = url;
+    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(el.poster, url);
     el.artBox.classList.remove("hidden");
     tint(url);
   }

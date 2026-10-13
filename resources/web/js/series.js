@@ -174,9 +174,8 @@ function showTile(show, onOpen) {
     image.loading = "lazy";
     image.decoding = "async";
     image.alt = "";
-    image.src =
-      "/api/art?kind=poster&tvshowid=" + encodeURIComponent(show.id) +
-      "&v=" + encodeURIComponent(show.poster);
+    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(image, "/api/art?kind=poster&tvshowid=" + encodeURIComponent(show.id) +
+      "&v=" + encodeURIComponent(show.poster));
     image.addEventListener("error", () => image.remove());
     frame.append(image);
   }
@@ -431,9 +430,8 @@ function episodeRow(episode) {
     image.loading = "lazy";
     image.decoding = "async";
     image.alt = "";
-    image.src =
-      "/api/art?kind=thumb&episodeid=" + encodeURIComponent(episode.id) +
-      "&v=" + encodeURIComponent(episode.thumb);
+    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(image, "/api/art?kind=thumb&episodeid=" + encodeURIComponent(episode.id) +
+      "&v=" + encodeURIComponent(episode.thumb));
     image.addEventListener("error", () => image.remove());
     frame.append(image);
   }

@@ -134,9 +134,8 @@ function continueTile(item) {
     image.alt = "";
     /* An episode stands on the row as its show's poster, which the box files
        under the episode's own id (see web/library/progress.py). */
-    image.src =
-      "/api/art?kind=poster&" + (episode ? "episodeid=" : "movieid=") +
-      encodeURIComponent(item.id) + "&v=" + encodeURIComponent(item.poster);
+    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(image, "/api/art?kind=poster&" + (episode ? "episodeid=" : "movieid=") +
+      encodeURIComponent(item.id) + "&v=" + encodeURIComponent(item.poster));
     image.addEventListener("error", () => image.remove());
     frame.append(image);
   }

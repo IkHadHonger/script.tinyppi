@@ -16,10 +16,10 @@
     const picture = new Image();
     picture.onload = () => {
       if (request !== generation || !picture.naturalWidth) return;
-      card.style.setProperty("--hero-fanart", "url(" + JSON.stringify(url) + ")");
+      card.style.setProperty("--hero-fanart", "url(" + JSON.stringify(picture.src) + ")");
       card.classList.add("has-fanart");
     };
-    picture.src = url;
+    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(picture, url);
   }
   window.TinyPPIHeroFanart = { show };
 })();

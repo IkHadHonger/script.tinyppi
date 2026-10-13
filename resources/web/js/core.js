@@ -456,13 +456,98 @@ window.TinyPPI = (function () {
     disconnect();
     if (document.hidden || !streamEnabled) return;
     setStatus("wait", T.connecting);
-    if (!token) { openStream(); return; }
+    if (!token || embeddedToken()) { openStream(); return; }
     const mine = attempt;
     openSession().then(() => { if (mine === attempt) openStream(); });
   }
 
+  /* Embedded boxes may have third-party cookies blocked. Their same-origin
+     requests carry the box's token in a header, including the live stream. */
+  function embeddedToken() {
+    return token && new URLSearchParams(location.search).get("embedded") === "1";
+  }
+
+  function headerStream() {
+    const controller = new AbortController();
+    const listeners = new Map();
+    const stream = {
+      readyState: 0,
+      addEventListener(name, listener) { listeners.set(name, listener); },
+      close() { stream.readyState = EventSource.CLOSED; controller.abort(); }
+    };
+    function emit(name, data) {
+      if (!controller.signal.aborted) listeners.get(name)?.({ data });
+    }
+    async function read() {
+      const response = await fetch("/api/stream", {
+        headers: tokenHeaders(), credentials: "omit", signal: controller.signal
+      });
+      if (!response.ok || !response.body) throw new Error("stream refused");
+      stream.readyState = 1;
+      emit("open");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = "", event = "message", data = [];
+      try {
+        while (!controller.signal.aborted) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          pending += decoder.decode(chunk.value, { stream: true });
+          if (pending.length > 2 * 1024 * 1024) throw new Error("oversized stream frame");
+          let newline;
+          while ((newline = pending.indexOf("\n")) !== -1) {
+            const line = pending.slice(0, newline).replace(/\r$/, "");
+            pending = pending.slice(newline + 1);
+            if (!line) {
+              if (data.length) emit(event, data.join("\n"));
+              event = "message";
+              data = [];
+            } else if (line.startsWith("event:")) {
+              event = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              data.push(line.slice(5).replace(/^ /, ""));
+            }
+          }
+        }
+      } finally {
+        await reader.cancel().catch(() => {});
+      }
+      if (!controller.signal.aborted) throw new Error("stream ended");
+    }
+    read().catch(() => {
+      stream.readyState = EventSource.CLOSED;
+      emit("error");
+    });
+    return stream;
+  }
+
+  const artworkLoads = new WeakMap();
+  function loadArtwork(image, url) {
+    const load = {};
+    artworkLoads.set(image, load);
+    if (!url) { image.removeAttribute("src"); return; }
+    if (!embeddedToken()) { image.src = url; return; }
+    /* A data URL keeps decoded artwork usable by the cover's canvas and the
+       fanart background, without a token in an address or a cookie. */
+    fetch(url, { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
+      if (!response.ok) throw new Error("artwork refused");
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (artworkLoads.get(image) === load) image.src = reader.result;
+      };
+      reader.onerror = () => {
+        if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
+      };
+      reader.readAsDataURL(blob);
+    }).catch(() => {
+      if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
+    });
+  }
+
   function openStream() {
-    source = new EventSource("/api/stream");
+    source = embeddedToken() ? headerStream() : new EventSource("/api/stream");
 
     source.addEventListener("open", () => {
       retryAt = 1000;
@@ -695,7 +780,7 @@ window.TinyPPI = (function () {
 
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
-    copyReport, reportLine, command, getJSON, saveDashboardTrust,
+    copyReport, reportLine, command, getJSON, saveDashboardTrust, loadArtwork,
     disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled, receiveSharedState,
     get token() { return token; }
   };

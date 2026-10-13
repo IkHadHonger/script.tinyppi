@@ -148,6 +148,7 @@ test("main dashboard shares its own iframe state with films and series", async (
     viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
     isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
   });
+  await context.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
   try {
     await context.route("**/api/hello*", async (route) => {
       const response = await route.fetch();
@@ -167,9 +168,11 @@ test("main dashboard shares its own iframe state with films and series", async (
       })));
       throw error;
     }
+    await main.keyboard.press("Shift");
     await main.locator('.tab[data-tab="films"]').click();
     await main.waitForSelector("#filmGrid .film");
     assert.equal(await main.locator("#filmGrid .film").count(), 20);
+    await main.keyboard.press("Shift");
     await main.locator('.tab[data-tab="series"]').click();
     await main.waitForSelector("#seriesGrid .film");
     assert.equal(await main.locator("#seriesGrid .film").count(), 5);
@@ -187,6 +190,55 @@ test("the token travels in headers only; the stream reads with an HttpOnly sessi
   assert.equal(session.sameSite, "Strict");
   assert.equal(session.path, "/api/");
   assert.equal(await page.evaluate(() => document.cookie), "");
+});
+
+test("a cross-site embedded box reads live state and artwork without cookies", async () => {
+  const mobile = process.env.BROWSER === "webkit";
+  const isolated = await browser.newContext({
+    viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+    isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
+  });
+  const seen = [];
+  const parentAddress = base.replace("127.0.0.1", "127.0.0.2");
+  try {
+    await isolated.route(parentAddress + "container", route => route.fulfill({
+      contentType: "text/html",
+      body: `<iframe style="width:100%;height:800px" src="${base}?embedded=1#live"></iframe>`
+    }));
+    await isolated.route("**/api/art?**", route => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jHHsAAAAASUVORK5CYII=", "base64")
+    }));
+    isolated.on("request", request => {
+      if (/\/api\/(stream|art)/.test(request.url())) seen.push(request);
+    });
+    const parent = await isolated.newPage();
+    await parent.goto(parentAddress + "container");
+    const box = parent.frameLocator("iframe");
+    await box.locator("#dlgOk").waitFor({ state: "attached" });
+    const frame = parent.frames().find(frame => frame.url().startsWith(base));
+    await frame.evaluate(() => TinyPPI.askToken());
+    await box.locator("#tokenInput").fill(TOKEN);
+    await box.locator("#dlgOk").click();
+    await box.locator('#status[data-state="live"]').waitFor();
+    await box.locator("#title").filter({ hasText: "Film" }).waitFor();
+    assert.equal(await frame.evaluate(() => new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image.naturalWidth);
+      image.onerror = () => reject(new Error("artwork did not load"));
+      TinyPPI.loadArtwork(image, "/api/art?kind=poster&v=12345678");
+    })), 1);
+    const authenticated = seen.filter(request => request.headers()["x-tinyppi-token"] === TOKEN);
+    assert.ok(authenticated.some(request => request.url().includes("/api/stream")));
+    assert.ok(authenticated.some(request => request.url().includes("/api/art?")));
+    for (const request of authenticated) {
+      assert.equal(request.headers().cookie, undefined);
+      assert.ok(!/token=/i.test(request.url()));
+    }
+    assert.deepEqual(await isolated.cookies(), []);
+  } finally {
+    await isolated.close();
+  }
 });
 
 test("no script errors anywhere", () => {
