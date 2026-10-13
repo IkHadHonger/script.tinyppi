@@ -217,7 +217,7 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
     const box = parent.frameLocator("iframe");
     await box.locator("#dlgOk").waitFor({ state: "attached" });
     const frame = parent.frames().find(frame => frame.url().startsWith(base));
-    await frame.evaluate(() => TinyPPI.askToken());
+    await frame.evaluate(() => window.TinyPPI.askToken());
     await box.locator("#tokenInput").fill(TOKEN);
     await box.locator("#dlgOk").click();
     await box.locator('#status[data-state="live"]').waitFor();
@@ -226,7 +226,7 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
       const image = new Image();
       image.onload = () => resolve(image.naturalWidth);
       image.onerror = () => reject(new Error("artwork did not load"));
-      TinyPPI.loadArtwork(image, "/api/art?kind=poster&v=12345678");
+      window.TinyPPI.loadArtwork(image, "/api/art?kind=poster&v=12345678");
     })), 1);
     const authenticated = seen.filter(request => request.headers()["x-tinyppi-token"] === TOKEN);
     assert.ok(authenticated.some(request => request.url().includes("/api/stream")));
