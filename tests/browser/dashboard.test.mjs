@@ -197,6 +197,7 @@ test("the token travels in headers only; the stream reads with an HttpOnly sessi
 });
 
 test("a cross-site embedded box reads live state and artwork without cookies", async () => {
+  await context.close();
   const mobile = process.env.BROWSER === "webkit";
   const isolated = await browser.newContext({
     viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
@@ -215,6 +216,10 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
     }));
     isolated.on("request", request => {
       if (/\/api\/(stream|art)/.test(request.url())) seen.push(request);
+    });
+    isolated.on("requestfailed", request => console.error("embedded network:", request.url(), request.failure()));
+    isolated.on("response", response => {
+      if (response.request().isNavigationRequest()) console.error("embedded response:", response.url(), response.status(), response.headers());
     });
     const parent = await isolated.newPage();
     parent.on("console", message => { if (message.type() === "error") console.error("embedded:", message.text()); });
