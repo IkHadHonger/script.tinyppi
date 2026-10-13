@@ -203,6 +203,8 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
     viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
     isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
   });
+  // Model a user who has allowed access to their local CoreELEC boxes.
+  await isolated.grantPermissions(["local-network-access"]);
   const seen = [];
   const parentAddress = base.replace("127.0.0.1", "127.0.0.2");
   try {
@@ -218,9 +220,6 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
       if (/\/api\/(stream|art)/.test(request.url())) seen.push(request);
     });
     isolated.on("requestfailed", request => console.error("embedded network:", request.url(), request.failure()));
-    isolated.on("response", response => {
-      if (response.request().isNavigationRequest()) console.error("embedded response:", response.url(), response.status(), response.headers());
-    });
     const parent = await isolated.newPage();
     parent.on("console", message => { if (message.type() === "error") console.error("embedded:", message.text()); });
     parent.on("pageerror", error => console.error("embedded page:", error.message));
