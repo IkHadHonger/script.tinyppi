@@ -81,26 +81,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install kodi-addon-checker==0.0.36
-      - name: Export the add-on without development files
-        run: |
-          mkdir -p "$RUNNER_TEMP/addons"
-          git archive HEAD --prefix=script.tinyppi/ | tar -x -C "$RUNNER_TEMP/addons"
-          cd "$RUNNER_TEMP/addons/script.tinyppi"
-          rm -rf .github tests tools .gitignore pyproject.toml requirements-dev.txt \
-                 package.json package-lock.json eslint.config.mjs
-      - name: Check
-        working-directory: ${{ runner.temp }}/addons
-        run: kodi-addon-checker --branch omega script.tinyppi
-
-  addon:
-    name: Kodi add-on checker
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.11"
-      - run: python -m pip install kodi-addon-checker==0.0.36
       # .gitattributes marks the development files export-ignore, so the
       # archive is the add-on as Kodi installs it.
       - name: Export the add-on without development files
@@ -112,4 +92,5 @@ jobs:
       # is in ours), and the dashboard's file types allowed (see the script).
       - name: Check
         working-directory: ${{ runner.temp }}/addons
-        run: python "$GITHUB_WORKSPACE/tools/check_addon.py" --branch piers --skip-dependency-checks script.tinyppi
+        run: python "$GITHUB_WORKSPACE/tools/check_addon.py" --branch omega --skip-dependency-checks script.tinyppi
+
