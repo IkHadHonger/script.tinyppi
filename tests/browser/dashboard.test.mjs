@@ -38,7 +38,7 @@ before(async () => {
                                              isMobile: mobile, hasTouch: mobile,
                                              reducedMotion: "reduce" });
   await context.addInitScript((token) => {
-    try { localStorage.setItem("tinyppi.token", token); } catch (_) {}
+    try { localStorage.setItem("tinyppi.token", token); } catch { /* Error pages may deny storage before the real frame loads. */ }
   }, TOKEN);
   page = await context.newPage();
   page.on("pageerror", (error) => problems.push("page error: " + error.message));
@@ -151,7 +151,7 @@ test("main dashboard shares its own iframe state with films and series", async (
     isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
   });
   await context.addInitScript((token) => {
-    try { localStorage.setItem("tinyppi.token", token); } catch (_) {}
+    try { localStorage.setItem("tinyppi.token", token); } catch { /* Error pages may deny storage before the real frame loads. */ }
   }, TOKEN);
   try {
     await context.route("**/api/hello*", async (route) => {
