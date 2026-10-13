@@ -37,7 +37,9 @@ before(async () => {
   context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
                                              isMobile: mobile, hasTouch: mobile,
                                              reducedMotion: "reduce" });
-  await context.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
+  await context.addInitScript((token) => {
+    try { localStorage.setItem("tinyppi.token", token); } catch (_) {}
+  }, TOKEN);
   page = await context.newPage();
   page.on("pageerror", (error) => problems.push("page error: " + error.message));
   page.on("console", (message) => {
@@ -148,7 +150,9 @@ test("main dashboard shares its own iframe state with films and series", async (
     viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
     isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
   });
-  await context.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
+  await context.addInitScript((token) => {
+    try { localStorage.setItem("tinyppi.token", token); } catch (_) {}
+  }, TOKEN);
   try {
     await context.route("**/api/hello*", async (route) => {
       const response = await route.fetch();
@@ -213,9 +217,17 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
       if (/\/api\/(stream|art)/.test(request.url())) seen.push(request);
     });
     const parent = await isolated.newPage();
+    parent.on("console", message => { if (message.type() === "error") console.error("embedded:", message.text()); });
+    parent.on("pageerror", error => console.error("embedded page:", error.message));
     await parent.goto(parentAddress + "container");
     const box = parent.frameLocator("iframe");
-    await box.locator("#dlgOk").waitFor({ state: "attached" });
+    try {
+      await box.locator("#dlgOk").waitFor({ state: "attached", timeout: 10000 });
+    } catch (error) {
+      console.error("embedded frames:", parent.frames().map(frame => frame.url()));
+      console.error("parent document:", await parent.content());
+      throw error;
+    }
     const frame = parent.frames().find(frame => frame.url().startsWith(base));
     await frame.evaluate(() => window.TinyPPI.askToken());
     await box.locator("#tokenInput").fill(TOKEN);

@@ -45,7 +45,7 @@ source = ["resources/lib", "main"]
 branch = true
 
 [tool.coverage.report]
-# Every line and branch is covered: new code comes with its tests.
+# Preserve the fork's existing coverage floor; new code comes with tests.
 fail_under = 70
 skip_empty = true
 
