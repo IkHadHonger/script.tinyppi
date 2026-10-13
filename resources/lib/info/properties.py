@@ -7,6 +7,8 @@ subtitles and system.
 ``info.publish`` writes them into the window properties the skin shows.
 """
 
+from __future__ import annotations
+
 import re
 
 from core.helpers import format_fps, normalize_fps

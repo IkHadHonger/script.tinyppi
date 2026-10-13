@@ -2,8 +2,8 @@
 # from this file.  CI (.github/workflows/ci.yml) runs the same checks.
 
 [tool.ruff]
-# Kodi 21+ on CoreELEC ships Python 3.11; the code needs 3.10 at least.
-target-version = "py310"
+# The fork supports Kodi 21+ on CoreELEC; keep Python 3.11 compatibility.
+target-version = "py311"
 line-length = 100
 extend-exclude = ["tests/kodi/helper"]
 
@@ -30,8 +30,6 @@ known-first-party = ["core", "info", "ui", "web", "xbmc", "xbmcaddon", "xbmcgui"
                      "dashboard_server"]
 
 [tool.ruff.lint.per-file-ignores]
-# The service puts resources/lib on sys.path before importing from it.
-"resources/lib/service/monitor.py" = ["E402"]
 # Long data rows and assertions in tests are easier to read on one line.
 "tests/**" = ["E501"]
 # The end-to-end scripts drive a real Kodi process and keep a module global.
@@ -42,17 +40,18 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.coverage.run]
-source = ["resources/lib"]
+# main.py is the script entry point; resources/lib holds everything else.
+source = ["resources/lib", "main"]
 branch = true
 
 [tool.coverage.report]
-# A floor, not a target: raise it as tests are added, never lower it.
+# Preserve the fork's existing coverage floor; new code comes with tests.
 fail_under = 70
 skip_empty = true
 
 [tool.mypy]
 platform = "linux"
-python_version = "3.10"
+python_version = "3.11"
 # Kodi's modules are typed by Kodistubs (pip install Kodistubs).
 mypy_path = ["resources/lib"]
 explicit_package_bases = true
@@ -61,8 +60,11 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 # Every function is annotated and its body checked.  Values of no fixed type
 # say so: ``object`` when only inspected, ``web.values.Unchecked`` for raw
-# request input.  Kodi windows and their stand-ins share
-# ``core.protocols.PropertyTarget``.
+# request input, ``web.values.Json`` for Kodi's JSON-RPC answers and
+# ``info.dvformat.Block`` for parsed side data.  Kodi windows and their
+# stand-ins share ``core.protocols.PropertyTarget``.  Containers name what
+# they hold; the dashboard's payloads are TypedDicts (web/payloads.py,
+# web/library/entries.py).
 check_untyped_defs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true

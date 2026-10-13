@@ -21,6 +21,8 @@ Best effort only: without the property, without DRM, or without the master
 descriptor there is simply no reset; the mode switch itself never fails.
 """
 
+from __future__ import annotations
+
 import ctypes
 import os
 

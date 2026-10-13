@@ -16,9 +16,10 @@ import { chromium, webkit } from "playwright";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TOKEN = "BROWSER1";
 
-let server, browser, page, base;
+let server, browser, context, page, base;
 const problems = [];
 const posts = [];
+const addresses = [];
 
 before(async () => {
   server = spawn(process.env.PYTHON || "python3", ["-I", join(HERE, "serve.py")],
@@ -33,17 +34,21 @@ before(async () => {
   base = `http://127.0.0.1:${port}/`;
   const mobile = process.env.BROWSER === "webkit";
   browser = await (mobile ? webkit : chromium).launch();
-  const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+  context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
                                              isMobile: mobile, hasTouch: mobile,
                                              reducedMotion: "reduce" });
-  await context.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
+  await context.addInitScript((token) => {
+    try { localStorage.setItem("tinyppi.token", token); } catch { /* Error pages may deny storage before the real frame loads. */ }
+  }, TOKEN);
   page = await context.newPage();
   page.on("pageerror", (error) => problems.push("page error: " + error.message));
   page.on("console", (message) => {
     if (message.type() === "error") problems.push("console: " + message.text());
   });
   page.on("request", (request) => {
-    if (request.method() === "POST") {
+    addresses.push(request.url());
+    // The session the token buys on connect is no write.
+    if (request.method() === "POST" && !request.url().endsWith("/api/session")) {
       posts.push([new URL(request.url()).pathname, JSON.parse(request.postData() || "{}")]);
     }
   });
@@ -145,6 +150,9 @@ test("main dashboard shares its own iframe state with films and series", async (
     viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
     isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
   });
+  await context.addInitScript((token) => {
+    try { localStorage.setItem("tinyppi.token", token); } catch { /* Error pages may deny storage before the real frame loads. */ }
+  }, TOKEN);
   try {
     await context.route("**/api/hello*", async (route) => {
       const response = await route.fetch();
@@ -164,14 +172,88 @@ test("main dashboard shares its own iframe state with films and series", async (
       })));
       throw error;
     }
+    await main.keyboard.press("Shift");
     await main.locator('.tab[data-tab="films"]').click();
     await main.waitForSelector("#filmGrid .film");
     assert.equal(await main.locator("#filmGrid .film").count(), 20);
+    await main.keyboard.press("Shift");
     await main.locator('.tab[data-tab="series"]').click();
     await main.waitForSelector("#seriesGrid .film");
     assert.equal(await main.locator("#seriesGrid .film").count(), 5);
   } finally {
     await context.close();
+  }
+});
+
+test("the token travels in headers only; the stream reads with an HttpOnly session", async () => {
+  assert.ok(addresses.some((address) => address.endsWith("/api/stream")));
+  assert.deepEqual(addresses.filter((address) => /token=/i.test(address)), []);
+  const [session] = (await context.cookies(base + "api/state")).filter((cookie) => cookie.name === "tinyppi_session");
+  assert.ok(session, "the session cookie is set");
+  assert.equal(session.httpOnly, true);
+  assert.equal(session.sameSite, "Strict");
+  assert.equal(session.path, "/api/");
+  assert.equal(await page.evaluate(() => document.cookie), "");
+});
+
+test("a cross-site embedded box reads live state and artwork without cookies", async () => {
+  await context.close();
+  const mobile = process.env.BROWSER === "webkit";
+  const isolated = await browser.newContext({
+    viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+    isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
+  });
+  // Model a user who has allowed access to their local CoreELEC boxes.
+  if (!mobile) await isolated.grantPermissions(["local-network-access"]);
+  const seen = [];
+  const parentAddress = base.replace("127.0.0.1", "127.0.0.2");
+  try {
+    await isolated.route(parentAddress + "container", route => route.fulfill({
+      contentType: "text/html",
+      body: `<iframe style="width:100%;height:800px" src="${base}?embedded=1#live"></iframe>`
+    }));
+    await isolated.route("**/api/art?**", route => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jHHsAAAAASUVORK5CYII=", "base64")
+    }));
+    isolated.on("request", request => {
+      if (/\/api\/(stream|art)/.test(request.url())) seen.push(request);
+    });
+    isolated.on("requestfailed", request => console.error("embedded network:", request.url(), request.failure()));
+    const parent = await isolated.newPage();
+    parent.on("console", message => { if (message.type() === "error") console.error("embedded:", message.text()); });
+    parent.on("pageerror", error => console.error("embedded page:", error.message));
+    await parent.goto(parentAddress + "container");
+    const box = parent.frameLocator("iframe");
+    try {
+      await box.locator("#dlgOk").waitFor({ state: "attached", timeout: 10000 });
+    } catch (error) {
+      console.error("embedded frames:", parent.frames().map(frame => frame.url()));
+      console.error("parent document:", await parent.content());
+      throw error;
+    }
+    const frame = parent.frames().find(frame => frame.url().startsWith(base));
+    await frame.evaluate(() => window.TinyPPI.askToken());
+    await box.locator("#tokenInput").fill(TOKEN);
+    await box.locator("#dlgOk").click();
+    await box.locator('#status[data-state="live"]').waitFor();
+    await box.locator("#title").filter({ hasText: "Film" }).waitFor();
+    assert.equal(await frame.evaluate(() => new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image.naturalWidth);
+      image.onerror = () => reject(new Error("artwork did not load"));
+      window.TinyPPI.loadArtwork(image, "/api/art?kind=poster&v=12345678");
+    })), 1);
+    const authenticated = seen.filter(request => request.headers()["x-tinyppi-token"] === TOKEN);
+    assert.ok(authenticated.some(request => request.url().includes("/api/stream")));
+    assert.ok(authenticated.some(request => request.url().includes("/api/art?")));
+    for (const request of authenticated) {
+      assert.equal(request.headers().cookie, undefined);
+      assert.ok(!/token=/i.test(request.url()));
+    }
+    assert.deepEqual(await isolated.cookies(), []);
+  } finally {
+    await isolated.close();
   }
 });
 

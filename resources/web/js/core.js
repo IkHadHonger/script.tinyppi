@@ -57,8 +57,13 @@ window.TinyPPI = (function () {
     search_clear: "Clear the search",
     runtime_hm: "%s h %s min", runtime_m: "%s min", runtime_h: "%s h",
     films_failed: "Playback could not be started", films_resume: "Resume",
-    films_watched: "Watched",
-    series: "Series", series_empty: "No series in the video library",
+    films_watched: "Watched", films_play: "Play",
+    play_from_start: "Play from the beginning", resume_clear: "Clear resume point",
+    mark_watched: "Mark as watched", mark_unwatched: "Mark as unwatched",
+    mark_failed: "The library could not be updated",
+    continue: "Continue watching", recent: "Recently added",
+    films_unseen: "Unwatched films", series_unseen_shows: "Unwatched series",
+    series: "Series", series_empty: "No series in the video library", series_open: "Open",
     series_search: "Search series", series_back: "All series",
     series_unseen: "Unwatched episodes", series_season: "Season %s",
     series_specials: "Specials",
@@ -161,6 +166,11 @@ window.TinyPPI = (function () {
     document.dispatchEvent(new CustomEvent('tinyppi-token'));
     connect();
   });
+
+  /* Counts connection attempts.  With a token, opening one waits on the
+     session first, and an attempt that a newer one -- or a disconnect --
+     overtook in the meantime must not open a stream of its own. */
+  let attempt = 0;
   /* The last whole snapshot.  Everything after the first frame of a
      connection arrives as a delta measured against it (see snapshot_delta in
      web/delta.py), so it is what those are applied to. */
@@ -204,8 +214,8 @@ window.TinyPPI = (function () {
       storeToken(token);
       /* The settings tab shows which token this device holds. */
       document.dispatchEvent(new CustomEvent("tinyppi-token"));
-      /* The stream carries the token in its URL -- an EventSource cannot send
-         a header -- so a new token means a new connection. */
+      /* The stream rides on a session the token buys (an EventSource cannot
+         send a header), so a new token means a new connection. */
       connect();
     });
 
@@ -226,10 +236,10 @@ window.TinyPPI = (function () {
 
   /* --- helpers ---------------------------------------------------------- */
 
-  function withToken(url) {
-    return token
-      ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token)
-      : url;
+  /* The token travels in a header only, never in an address: addresses end
+     up in histories and logs. */
+  function tokenHeaders() {
+    return token ? { "X-TinyPPI-Token": token } : {};
   }
 
   async function saveDashboardTrust(origins) {
@@ -335,6 +345,7 @@ window.TinyPPI = (function () {
      always opens with a whole snapshot, so nothing may be patched onto what an
      older one left behind. */
   function disconnect() {
+    attempt += 1;
     stopRetry();
     if (source) { source.close(); source = null; }
     base = null;
@@ -427,11 +438,116 @@ window.TinyPPI = (function () {
 
   /* --- connecting -------------------------------------------------------- */
 
+  /* What a browser cannot put a header on -- the stream, the pictures --
+     carries a session cookie instead, which the token buys here (see
+     _start_session in web/routes.py).  It is bought on every connect: it
+     lasts only as long as the add-on's server does.  A refusal is left to the
+     stream: one that needs no token opens anyway, and one that does fails
+     into probe, which says why. */
+  function openSession() {
+    return fetch("/api/session", {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, tokenHeaders()),
+      body: "{}"
+    }).catch(() => { /* the stream will find the outage */ });
+  }
+
   function connect() {
     disconnect();
     if (document.hidden || !streamEnabled) return;
     setStatus("wait", T.connecting);
-    source = new EventSource(withToken("/api/stream"));
+    if (!token || embeddedToken()) { openStream(); return; }
+    const mine = attempt;
+    openSession().then(() => { if (mine === attempt) openStream(); });
+  }
+
+  /* Embedded boxes may have third-party cookies blocked. Their same-origin
+     requests carry the box's token in a header, including the live stream. */
+  function embeddedToken() {
+    return token && new URLSearchParams(location.search).get("embedded") === "1";
+  }
+
+  function headerStream() {
+    const controller = new AbortController();
+    const listeners = new Map();
+    const stream = {
+      readyState: 0,
+      addEventListener(name, listener) { listeners.set(name, listener); },
+      close() { stream.readyState = EventSource.CLOSED; controller.abort(); }
+    };
+    function emit(name, data) {
+      if (!controller.signal.aborted) listeners.get(name)?.({ data });
+    }
+    async function read() {
+      const response = await fetch("/api/stream", {
+        headers: tokenHeaders(), credentials: "omit", signal: controller.signal
+      });
+      if (!response.ok || !response.body) throw new Error("stream refused");
+      stream.readyState = 1;
+      emit("open");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = "", event = "message", data = [];
+      try {
+        while (!controller.signal.aborted) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          pending += decoder.decode(chunk.value, { stream: true });
+          if (pending.length > 2 * 1024 * 1024) throw new Error("oversized stream frame");
+          let newline;
+          while ((newline = pending.indexOf("\n")) !== -1) {
+            const line = pending.slice(0, newline).replace(/\r$/, "");
+            pending = pending.slice(newline + 1);
+            if (!line) {
+              if (data.length) emit(event, data.join("\n"));
+              event = "message";
+              data = [];
+            } else if (line.startsWith("event:")) {
+              event = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              data.push(line.slice(5).replace(/^ /, ""));
+            }
+          }
+        }
+      } finally {
+        await reader.cancel().catch(() => {});
+      }
+      if (!controller.signal.aborted) throw new Error("stream ended");
+    }
+    read().catch(() => {
+      stream.readyState = EventSource.CLOSED;
+      emit("error");
+    });
+    return stream;
+  }
+
+  const artworkLoads = new WeakMap();
+  function loadArtwork(image, url) {
+    const load = {};
+    artworkLoads.set(image, load);
+    if (!url) { image.removeAttribute("src"); return; }
+    if (!embeddedToken()) { image.src = url; return; }
+    /* A data URL keeps decoded artwork usable by the cover's canvas and the
+       fanart background, without a token in an address or a cookie. */
+    fetch(url, { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
+      if (!response.ok) throw new Error("artwork refused");
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (artworkLoads.get(image) === load) image.src = reader.result;
+      };
+      reader.onerror = () => {
+        if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
+      };
+      reader.readAsDataURL(blob);
+    }).catch(() => {
+      if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
+    });
+  }
+
+  function openStream() {
+    source = embeddedToken() ? headerStream() : new EventSource("/api/stream");
 
     source.addEventListener("open", () => {
       retryAt = 1000;
@@ -483,7 +599,7 @@ window.TinyPPI = (function () {
      add-on wants a token, whether it is simply carrying as many streams as it
      will, and whether it is there at all. */
   function probe() {
-    fetch(withToken("/api/state")).then((response) => {
+    fetch("/api/state", { headers: tokenHeaders() }).then((response) => {
       if (response.status === 401) {
         setStatus("down", T.token_bad);
         /* A first visit to a page that wants a token has not got one wrong;
@@ -623,7 +739,10 @@ window.TinyPPI = (function () {
     connect();
 
     try {
-      const hello = await (await fetch("/api/hello")).json();
+      const response = await fetch("/api/hello");
+      /* An error page may carry JSON of its own, and none of it is a hello. */
+      if (!response.ok) return;
+      const hello = await response.json();
       Object.assign(T, hello.strings || {});
       applyChromeStrings();
       if (options.onStrings) options.onStrings(T, hello);
@@ -652,17 +771,16 @@ window.TinyPPI = (function () {
     }
   }
 
-  /* Whatever the stream and the images need: the token travels in the URL for
-     everything a browser cannot put a header on. */
+  /* A read with the token in its header, for when reading needs it. */
   async function getJSON(url) {
-    const response = await fetch(withToken(url));
+    const response = await fetch(url, { headers: tokenHeaders() });
     if (!response.ok) throw new Error(String(response.status));
     return response.json();
   }
 
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
-    copyReport, reportLine, command, getJSON, withToken, saveDashboardTrust,
+    copyReport, reportLine, command, getJSON, saveDashboardTrust, loadArtwork,
     disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled, receiveSharedState,
     get token() { return token; }
   };

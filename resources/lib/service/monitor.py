@@ -1,22 +1,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 U3knOwn
 
-"""Background service (xbmc.service).
+"""Background service (xbmc.service, started through service/start.py).
 
 Keeps a Kodi monitor alive for the session to react to notifications, opens
 views handed over by main.py, runs the splash and owns the web dashboard.
 """
 
+from __future__ import annotations
+
 import os
-import sys
 import threading
 
 import xbmc
-
-_LIB_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _LIB_PATH not in sys.path:
-    sys.path.insert(0, _LIB_PATH)
-
 from core import images, settings
 from core.constants import (
     ADDON_ID,
@@ -52,7 +48,7 @@ _SKIN_SETTLE = 1.0
 _WARMUP_DELAY = 5.0
 
 # Notifications that make the dashboard's cached lists stale.  The lists are
-# dropped and re-read on the next request (see web/library.py).  Item
+# dropped and re-read on the next request (see web/library/cache.py).  Item
 # notifications come in bursts (a scan sends one per item) and are coalesced
 # into one drop; the end of a scan or a clean drops the lists at once.
 _LIBRARY_ITEM_NOTIFICATIONS = (
@@ -258,7 +254,8 @@ def _warm_up(monitor: xbmc.Monitor) -> None:
         _log(f"tidying the texture cache failed: {exc}", xbmc.LOGWARNING)
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Run the service until Kodi shuts down."""
     addon     = settings.addon()
     win       = home_window()
     dashboard = WebDashboard()

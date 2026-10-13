@@ -7,6 +7,8 @@ Free of Kodi imports, so main.py can read them on its fast path before
 anything else is loaded.
 """
 
+from __future__ import annotations
+
 ADDON_ID = "script.tinyppi"
 
 # The add-on's data folder: stored settings, custom colours, scaled logos.

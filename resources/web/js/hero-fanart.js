@@ -12,14 +12,14 @@
     card.style.removeProperty("--hero-fanart");
     card.classList.remove("has-fanart");
     if (!tag) return;
-    const url = TinyPPI.withToken("/api/art?kind=fanart&v=" + encodeURIComponent(tag));
+    const url = "/api/art?kind=fanart&v=" + encodeURIComponent(tag);
     const picture = new Image();
     picture.onload = () => {
       if (request !== generation || !picture.naturalWidth) return;
-      card.style.setProperty("--hero-fanart", "url(" + JSON.stringify(url) + ")");
+      card.style.setProperty("--hero-fanart", "url(" + JSON.stringify(picture.src) + ")");
       card.classList.add("has-fanart");
     };
-    picture.src = url;
+    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(picture, url);
   }
   window.TinyPPIHeroFanart = { show };
 })();

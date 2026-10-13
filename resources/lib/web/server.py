@@ -10,6 +10,8 @@ the page's files in web/static.py.  Routes are a fixed table, never a filesystem
 state change needs the token.  The server is off unless enabled.
 """
 
+from __future__ import annotations
+
 import contextlib
 import secrets
 import socket
@@ -17,7 +19,9 @@ import sys
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from http.server import ThreadingHTTPServer
+from typing import cast
 
 import xbmc
 import xbmcaddon
@@ -62,7 +66,6 @@ _log = channel("web", xbmc.LOGINFO)
 
 # What socketserver hands the request hooks (a TCP server only sees sockets).
 _Request = socket.socket | tuple[bytes, socket.socket]
-
 
 
 # --- Settings --------------------------------------------------------------
@@ -134,6 +137,9 @@ class _Server(ThreadingHTTPServer):
         self.producer      = producer
         self.stop_event    = stop_event
         self.token         = token
+        # The read session cookie's value (see web/routes.py), new with
+        # every server, so a new token (which restarts it) ends old sessions.
+        self.session       = secrets.token_urlsafe(32)
         self.static_routes = static.routes()
         self.static_files  = static.StaticFiles()
         # Wrong-token tracking and lockouts.
@@ -151,9 +157,9 @@ class _Server(ThreadingHTTPServer):
         self._worker_lock  = threading.Lock()
         # Open connections and their addresses, so stop() can hang up on
         # idle keep-alives and verify_request() can cap them.
-        self._connections: dict = {}
-        # The monotonic clock can start near zero on a fresh CI runner or
-        # box. The first refusal must be logged regardless of its uptime.
+        self._connections: dict[_Request, str] = {}
+        # monotonic() counts from boot, and Kodi starts seconds after it:
+        # 0.0 would hide every refusal in the first minute.
         self._refusal_logged = float("-inf")
         # Cached poster and fanart of the playing title.
         self._art = artwork.PlayingArtwork()
@@ -209,7 +215,8 @@ class _Server(ThreadingHTTPServer):
             connections = list(self._connections)
             for connection in connections:
                 with contextlib.suppress(OSError):
-                    connection.shutdown(how)
+                    # A TCP server's requests are its connections' sockets.
+                    cast(socket.socket, connection).shutdown(how)
         return len(connections)
 
     def process_request_thread(self, request: _Request, client_address: tuple[str, int]) -> None:
@@ -269,7 +276,7 @@ class _Server(ThreadingHTTPServer):
     def episode_artwork(self, episode_id: str, kind: str) -> tuple[bytes, str] | None:
         """Return an episode still, or None.
 
-        Only episodes of opened series are known (see web/library.py).
+        Only episodes of opened series are known (see web/library/series.py).
         """
         if not (self.offer_series and self.allow_control):
             return None
@@ -389,18 +396,32 @@ class WebDashboard:
             return
 
         server.refresh_settings()
-        self._server = server
-        self._port   = port
-        self._token  = token
-        self._producer.start()
-        self._thread = threading.Thread(
+        thread = threading.Thread(
             target=server.serve_forever,
             # Short poll, so shutdown() returns quickly.
             kwargs={"poll_interval": 0.1},
             name="TinyPPI-web-server",
             daemon=True,
         )
-        self._thread.start()
+        try:
+            self._producer.start()
+            thread.start()
+        except RuntimeError as exc:  # RuntimeError("can't start new thread")
+            _log(f"cannot start the dashboard: {exc}", xbmc.LOGERROR)
+            # Not stop(): serve_forever never ran, so server.shutdown() would
+            # wait forever.  End the producer if it started, close the socket.
+            self._stop.set()
+            self._producer.wake()
+            if self._producer.is_alive():
+                self._producer.join(timeout=_JOIN_TIMEOUT)
+            server.server_close()
+            self._stop = None
+            self._producer = None
+            return
+        self._server = server
+        self._thread = thread
+        self._port   = port
+        self._token  = token
         _log(f"dashboard listening on {local_address(port)}")
 
     def stop(self, final: bool = False) -> None:
@@ -438,48 +459,50 @@ class WebDashboard:
                 producer.wake()
 
             if server is not None:
-                # End the accept loop, then always close the listening socket.
-                try:
-                    server.shutdown()
-                except Exception as exc:
-                    _log(f"server shutdown failed: {exc}", xbmc.LOGWARNING)
-                finally:
-                    try:
-                        server.server_close()
-                    except Exception as exc:
-                        _log(f"server close failed: {exc}", xbmc.LOGWARNING)
-                    # No new connections now; end the idle reads at once.
-                    try:
-                        server.close_connections()
-                    except Exception as exc:
-                        _log(f"closing connections failed: {exc}",
-                             xbmc.LOGWARNING)
+                _close_server(server)
+            _join_all(thread, producer, server)
 
-            # Then wait for the threads, with one shared deadline.
-            deadline = time.monotonic() + _JOIN_TIMEOUT
 
-            def remaining() -> float:
-                return max(0.0, deadline - time.monotonic())
+def _guarded(step: Callable[[], object], failure: str) -> None:
+    """Run one shutdown step, logging rather than raising when it fails."""
+    try:
+        step()
+    except Exception as exc:
+        _log(f"{failure}: {exc}", xbmc.LOGWARNING)
 
-            if thread is not None:
-                thread.join(timeout=remaining())
-                if thread.is_alive():
-                    _log("web server thread did not stop", xbmc.LOGWARNING)
-            if producer is not None:
-                producer.join(timeout=remaining())
-                if producer.is_alive():
-                    _log("snapshot producer did not stop", xbmc.LOGWARNING)
-            if server is not None:
-                # A thread still running after the grace period is stuck
-                # writing; cut its connection off.
-                left = server.join_workers(min(remaining(), _HANGUP_GRACE))
-                if left:
-                    try:
-                        server.close_connections(socket.SHUT_RDWR)
-                    except Exception as exc:
-                        _log(f"closing connections failed: {exc}",
-                             xbmc.LOGWARNING)
-                    left = server.join_workers(remaining())
-                if left:
-                    _log(f"{left} request thread(s) still running",
-                         xbmc.LOGWARNING)
+
+def _close_server(server: _Server) -> None:
+    """End the accept loop, then always close the listening socket."""
+    try:
+        _guarded(server.shutdown, "server shutdown failed")
+    finally:
+        _guarded(server.server_close, "server close failed")
+        # No new connections now; end the idle reads at once.
+        _guarded(server.close_connections, "closing connections failed")
+
+
+def _join_all(thread: threading.Thread | None, producer: Producer | None,
+              server: _Server | None) -> None:
+    """Wait for the server's threads, with one shared deadline."""
+    deadline = time.monotonic() + _JOIN_TIMEOUT
+
+    def remaining() -> float:
+        return max(0.0, deadline - time.monotonic())
+
+    for waited, name in ((thread, "web server thread"),
+                         (producer, "snapshot producer")):
+        if waited is not None:
+            waited.join(timeout=remaining())
+            if waited.is_alive():
+                _log(f"{name} did not stop", xbmc.LOGWARNING)
+    if server is None:
+        return
+    # A thread still running after the grace period is stuck writing; cut
+    # its connection off.
+    left = server.join_workers(min(remaining(), _HANGUP_GRACE))
+    if left:
+        _guarded(lambda: server.close_connections(socket.SHUT_RDWR),
+                 "closing connections failed")
+        left = server.join_workers(remaining())
+    if left:
+        _log(f"{left} request thread(s) still running", xbmc.LOGWARNING)
