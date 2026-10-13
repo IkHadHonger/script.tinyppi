@@ -204,7 +204,7 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
     isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
   });
   // Model a user who has allowed access to their local CoreELEC boxes.
-  await isolated.grantPermissions(["local-network-access"]);
+  if (!mobile) await isolated.grantPermissions(["local-network-access"]);
   const seen = [];
   const parentAddress = base.replace("127.0.0.1", "127.0.0.2");
   try {
