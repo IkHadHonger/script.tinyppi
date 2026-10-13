@@ -3,6 +3,8 @@
 
 """Text helpers shared by the snapshot, the player state and the library."""
 
+from __future__ import annotations
+
 import re
 from typing import Any
 
@@ -11,6 +13,10 @@ from info.dvinfo import is_status_label
 # A value straight from a request (query or JSON body): any type, or None.
 # The function receiving it validates and converts it.
 Unchecked = Any
+
+# A JSON object from Kodi (a JSON-RPC answer, or one of its rows): whatever
+# Kodi sent, read with ``get`` and checked where a value is used.
+Json = dict[str, Any]
 
 
 def library_id(value: Unchecked) -> int:

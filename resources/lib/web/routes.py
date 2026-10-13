@@ -7,12 +7,15 @@ Routes are a fixed table, never a filesystem lookup; every state change
 needs the token.
 """
 
+from __future__ import annotations
+
 import gzip
 import json
 import math
 import re
 import secrets
 import time
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING
@@ -24,10 +27,13 @@ from core.log import channel
 from web import access, artwork, library
 from web.dashboard_trust import page_policy, trusted_origins
 from web.delta import snapshot_delta
+from web.library.entries import Listing
+from web.payloads import DeltaFrame, Snapshot
 from web.player import apply_command
 from web.producer import PRODUCE_INTERVAL, Producer
 from web.static import MIN_COMPRESS, STATIC_CACHE
 from web.strings import ui_strings
+from web.values import Unchecked
 from web.vs10 import apply_mode
 
 if TYPE_CHECKING:  # web.server imports this module
@@ -50,13 +56,29 @@ _STREAM_WRITE_TIMEOUT = 4.0
 # Maximum request body size (POST bodies are tiny).
 _MAX_BODY = 4096
 
-# The token in a request line (stream and image URLs carry it in the query,
-# see withToken in js/core.js); masked before logging, since debug logs get
-# posted to forums.
+# A token in a request line.  The page never puts it there (see the session
+# below), and the server no longer reads it from there, but a page from an
+# older version or a hand-typed address may; masked before logging, since
+# debug logs get posted to forums.
 _TOKEN_IN_QUERY = re.compile(r"(token=)[^&\s\"']*", re.IGNORECASE)
 
+# The read session.  What a browser cannot send a header with (the event
+# stream, images) carries this cookie instead of the token: the page trades
+# the token for it once per connection (POST /api/session, see connect in
+# js/core.js).  HttpOnly keeps it from scripts, SameSite=Strict from other
+# sites' requests, and it is valid for reading only and for this server's
+# lifetime (a new token restarts the server).  No Max-Age: it ends with the
+# browser session.
+_SESSION_COOKIE = "tinyppi_session"
+_SESSION_ATTRIBUTES = "Path=/api/; HttpOnly; SameSite=Strict"
+
+# An artwork tag as the add-on makes them (CRC-32 in hex, see
+# snapshot._art_tags and library.common.tag).  It goes into the ETag header, so
+# anything else (e.g. an encoded CR/LF that would add headers) is no tag.
+_ART_TAG = re.compile(r"[0-9a-f]{1,16}")
+
 # Headers on every response: no framing (clickjacking) and no referrer
-# (some URLs carry the token).
+# (nothing in a URL should leave the page).
 _SECURITY_HEADERS = (
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "SAMEORIGIN"),
@@ -84,6 +106,11 @@ _PAGE_POLICY = "; ".join(
 _log = channel("web", xbmc.LOGINFO)
 
 
+def _param(query: dict[str, list[str]], name: str) -> str:
+    """Return the first value of *name* in a parsed query, or ''."""
+    return (query.get(name) or [""])[0]
+
+
 class Handler(BaseHTTPRequestHandler):
     """The request handler; ``server`` holds the producer, token and files."""
 
@@ -94,7 +121,7 @@ class Handler(BaseHTTPRequestHandler):
     # hold a thread forever.
     timeout = _REQUEST_TIMEOUT
 
-    server: "_Server"
+    server: _Server
 
     # --- Plumbing ----------------------------------------------------------
 
@@ -142,14 +169,9 @@ class Handler(BaseHTTPRequestHandler):
             part.strip().removeprefix("W/") for part in offered.split(",")
         ]
 
-    def _send_json(
-        self,
-        payload: dict,
-        status: HTTPStatus = HTTPStatus.OK,
-        etag: str = "",
-        cache: str = "no-store",
-        extra: tuple[tuple[str, str], ...] = (),
-    ) -> None:
+    def _send_json(self, payload: Mapping[str, object], status: HTTPStatus = HTTPStatus.OK,
+                   etag: str = "", cache: str = "no-store",
+                   extra: tuple[tuple[str, str], ...] = ()) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         if etag:
             extra += (("ETag", etag),)
@@ -165,18 +187,40 @@ class Handler(BaseHTTPRequestHandler):
     # --- Auth --------------------------------------------------------------
 
     def _presented_token(self) -> str:
-        header = self.headers.get("X-TinyPPI-Token", "")
-        if header:
-            return header.strip()
-        query = parse_qs(urlparse(self.path).query)
-        return (query.get("token") or [""])[0].strip()
+        """Return the token in the request's header, or ''.
 
-    def _token_holder(self) -> bool:
+        Only the header counts: a URL ends up in logs and histories.
+        """
+        return self.headers.get("X-TinyPPI-Token", "").strip()
+
+    def _session_holder(self) -> bool:
+        """Return whether the request carries this server's read session.
+
+        Parsed by hand: cookies are per host, not per port, so the header
+        may carry those of other services on the box (Kodi's own web
+        interface, say), and ``http.cookies`` drops every cookie when one
+        of them does not parse.
+        """
+        expected = self.server.session.encode("ascii")
+        for part in self.headers.get("Cookie", "").split(";"):
+            name, _sep, value = part.partition("=")
+            if name.strip() != _SESSION_COOKIE:
+                continue
+            offered = value.strip().encode("utf-8", "replace")
+            if len(offered) == len(expected) and secrets.compare_digest(offered, expected):
+                return True
+        return False
+
+    def _token_holder(self, session: bool = False) -> bool:
         """Return whether the request carries the token.
 
-        Otherwise it has been answered with 401, or 429 for a locked-out
+        With *session*, the read session counts as the token (reads only):
+        it cannot be guessed, so it is checked before any lockout.  Otherwise
+        the request has been answered with 401, or 429 for a locked-out
         address (see ``access.Guesses``).
         """
+        if session and self._session_holder():
+            return True
         address = access.client_key(self.client_address[0])
         wait = self.server.guesses.locked_for(address)
         if wait:
@@ -200,10 +244,13 @@ class Handler(BaseHTTPRequestHandler):
     def _token_to_read(self) -> bool:
         """Return whether reading needs the token for this request.
 
-        When the setting says so, or for an untrusted host name (see
+        When the setting says so, for a client beyond the home network (see
+        ``access.home_peer``), or for an untrusted host name (see
         ``access.trusted_host``).
         """
-        return self.server.auth_read or not access.trusted_host(self.headers.get("Host", ""))
+        return (self.server.auth_read
+                or not access.home_peer(self.client_address[0])
+                or not access.trusted_host(self.headers.get("Host", "")))
 
     # --- Routing -----------------------------------------------------------
 
@@ -214,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         reader = _READERS.get(route)
         if reader is not None:
-            if self._token_to_read() and not self._token_holder():
+            if self._token_to_read() and not self._token_holder(session=True):
                 return
             reader(self)
             return
@@ -230,7 +277,13 @@ class Handler(BaseHTTPRequestHandler):
         if payload is None:
             return
 
-        writer = _WRITERS.get(urlparse(self.path).path)
+        route = urlparse(self.path).path
+        if route == "/api/session":
+            # For reading, so control need not be allowed; the token must.
+            if self._token_holder():
+                self._start_session()
+            return
+        writer = _WRITERS.get(route)
         if writer is None:
             self._send_error_json(HTTPStatus.NOT_FOUND, "no such route")
             return
@@ -267,6 +320,13 @@ class Handler(BaseHTTPRequestHandler):
             }
         )
 
+    def _start_session(self) -> None:
+        """Hand a token holder the read session cookie."""
+        self._send_json({"ok": True}, extra=((
+            "Set-Cookie",
+            f"{_SESSION_COOKIE}={self.server.session}; {_SESSION_ATTRIBUTES}",
+        ),))
+
     def _serve_state(self) -> None:
         """Send the current snapshot to a page without a stream."""
         self._send_json(self._state_payload())
@@ -275,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
         """Send the chart history and events (on connect and new events)."""
         self._send_json(self.server.producer.history())
 
-    def _set_mode(self, payload: dict) -> None:
+    def _set_mode(self, payload: dict[str, Unchecked]) -> None:
         """Switch the VS10 output mode."""
         mode = str(payload.get("mode", "")).strip()
         if not apply_mode(mode):
@@ -284,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
         _log(f"VS10 mode '{mode}' requested from {self._peer}")
         self._send_json({"ok": True, "mode": mode})
 
-    def _run_command(self, payload: dict) -> None:
+    def _run_command(self, payload: dict[str, Unchecked]) -> None:
         """Run a transport command (play/pause, seek, volume, ...)."""
         action = str(payload.get("action", "")).strip()
         if not apply_command(action, payload.get("value")):
@@ -297,7 +357,7 @@ class Handler(BaseHTTPRequestHandler):
         )
         self._send_json({"ok": True, "action": action})
 
-    def _read_json_body(self) -> dict | None:
+    def _read_json_body(self) -> dict[str, Unchecked] | None:
         """Return the JSON body as a dict, or None after sending an error."""
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -318,8 +378,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- Responses ---------------------------------------------------------
 
-    def _state_payload(self) -> dict:
-        payload = dict(self.server.producer.fresh())
+    def _state_payload(self) -> Snapshot:
+        payload = self.server.producer.fresh().copy()
         payload["control"] = self.server.allow_control
         # Whether a stream would be refused now: an EventSource cannot read
         # the 503, so the page asks here (see connect() in js/core.js).
@@ -340,7 +400,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_listing(payload)
 
-    def _start_film(self, payload: dict) -> None:
+    def _start_film(self, payload: dict[str, Unchecked]) -> None:
         """Start a film or an episode, depending on the id in *payload*."""
         # resume=False starts from the beginning; anything else resumes.
         resume = payload.get("resume") is not False
@@ -367,7 +427,7 @@ class Handler(BaseHTTPRequestHandler):
         # The page learns about the playback from the next snapshot.
         self._send_json({"ok": True, "movieid": movie_id})
 
-    def _mark_watched(self, payload: dict) -> None:
+    def _mark_watched(self, payload: dict[str, Unchecked]) -> None:
         """Mark a film, series or episode as watched or unwatched.
 
         The id in *payload* selects the kind; each needs its shelf's setting.
@@ -394,7 +454,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_error_json(HTTPStatus.BAD_REQUEST, "no title named")
 
-    def _clear_resume(self, payload: dict) -> None:
+    def _clear_resume(self, payload: dict[str, Unchecked]) -> None:
         """Clear the resume point of a film or episode."""
         for key, kind, offered in (
             ("movieid", "movie", self.server.offer_library),
@@ -431,7 +491,7 @@ class Handler(BaseHTTPRequestHandler):
         if not (self.server.offer_series and self.server.allow_control):
             self._send_error_json(HTTPStatus.FORBIDDEN, "library disabled")
             return
-        show = (parse_qs(urlparse(self.path).query).get("tvshowid") or [""])[0]
+        show = _param(parse_qs(urlparse(self.path).query), "tvshowid")
         try:
             payload = library.episodes(show)
         except Exception as exc:
@@ -462,7 +522,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_listing(payload)
 
-    def _send_listing(self, payload: dict) -> None:
+    def _send_listing(self, payload: Listing) -> None:
         """Send a library list with its tag as ETag (304 when unchanged)."""
         etag = f'"{payload["tag"]}"'
         if self._holds(etag):
@@ -473,30 +533,21 @@ class Handler(BaseHTTPRequestHandler):
     def _serve_art(self) -> None:
         """Send artwork of the playing title or a library item."""
         query = parse_qs(urlparse(self.path).query)
-        kind = (query.get("kind") or [""])[0]
+        kind = _param(query, "kind")
         if kind not in artwork.KINDS:
             self._send_error_json(HTTPStatus.NOT_FOUND, "no such artwork")
             return
-        # No library id means the playing title.
-        film = (query.get("movieid") or [""])[0]
-        show = (query.get("tvshowid") or [""])[0]
-        episode = (query.get("episodeid") or [""])[0]
         # The URL carries the picture's tag, so the answer is immutable.
-        tag = (query.get("v") or [""])[0]
+        tag  = _param(query, "v")
+        if not _ART_TAG.fullmatch(tag):
+            tag = ""
         etag = f'"{tag}"' if tag else ""
         cache = artwork.CACHE if tag else "no-store"
         if etag and self._holds(etag):
             self._send_unchanged(etag, cache)
             return
 
-        if film:
-            found = self.server.library_artwork(film, kind)
-        elif show:
-            found = self.server.series_artwork(show, kind)
-        elif episode:
-            found = self.server.episode_artwork(episode, kind)
-        else:
-            found = self.server.artwork(kind)
+        found = self._find_art(query, kind)
         if found is None:
             # No artwork: the page hides the frame.
             self._send_error_json(HTTPStatus.NOT_FOUND, "no artwork")
@@ -505,6 +556,18 @@ class Handler(BaseHTTPRequestHandler):
         self._send(
             HTTPStatus.OK, body, content_type, (("ETag", etag),) if etag else (), cache=cache
         )
+
+    def _find_art(self, query: dict[str, list[str]], kind: str) -> tuple[bytes, str] | None:
+        """Return the requested picture and its type, or None."""
+        # No library id means the playing title.
+        lookups = (("movieid", self.server.library_artwork),
+                   ("tvshowid", self.server.series_artwork),
+                   ("episodeid", self.server.episode_artwork))
+        for name, lookup in lookups:
+            item = _param(query, name)
+            if item:
+                return lookup(item, kind)
+        return self.server.artwork(kind)
 
     def _serve_static(self, route: str) -> None:
         path, content_type = self.server.static_routes[route]
@@ -571,7 +634,7 @@ class Handler(BaseHTTPRequestHandler):
     def _stream_frames(self, producer: Producer, seen: int) -> None:
         stop = self.server.stop_event
         # Last payload sent on this connection, the base of the next delta.
-        sent: dict | None = None
+        sent: Snapshot | None = None
         last_beat = time.monotonic()
         # Bound writes to a client that stopped reading (OSError ends the
         # stream); shorter than the heartbeat interval.
@@ -590,8 +653,9 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             seen = snapshot.get("seq", 0)
             last_beat = now
-            payload = dict(snapshot)
+            payload = snapshot.copy()
             payload["control"] = self.server.allow_control
+            frame: Snapshot | DeltaFrame
             if sent is None:
                 kind, frame = "state", payload
             else:

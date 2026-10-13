@@ -10,6 +10,8 @@ the new content goes to a temporary file next to the target, is flushed to
 storage, and then renamed over the target in one step.
 """
 
+from __future__ import annotations
+
 import contextlib
 import os
 import stat

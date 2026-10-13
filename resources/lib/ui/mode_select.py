@@ -7,6 +7,8 @@ Open via ``RunScript(script.tinyppi,dialog)`` or ``open_dialog()``; the
 chosen mode is applied by ``core.vs10.set_mode``.
 """
 
+from __future__ import annotations
+
 import threading
 from typing import Any
 
@@ -69,13 +71,13 @@ class SettingsDialog(xbmcgui.WindowXMLDialog):
         left, top = dialog_layout.panel_position(self._layout)
         try:
             self.getControl(dialog_layout.GROUP_PANEL).setPosition(left, top)
-        except Exception as e:
+        except RuntimeError as e:
             log(f"could not place the dialog panel: {e}", xbmc.LOGWARNING)
         home_window().setProperty(dialog_layout.PROP_PLACED, "1")
         # Default focus went nowhere while hidden; focus the visible branch.
         self._sync_branch(force=True)
 
-    def _branch(self) -> dict:
+    def _branch(self) -> dialog_layout.Branch:
         home = home_window()
         return dialog_layout.branch_for(
             home.getProperty("TinyPPI.HdrType"),
@@ -99,13 +101,13 @@ class SettingsDialog(xbmcgui.WindowXMLDialog):
             focus = branch["buttons"][0][0]
         try:
             self.setFocusId(focus)
-        except Exception as e:
+        except RuntimeError as e:
             log(f"could not focus dialog button {focus}: {e}", xbmc.LOGDEBUG)
 
     def _set_label(self, control_id: int, text: str) -> None:
         try:
             self.getControl(control_id).setLabel(text)
-        except Exception as e:
+        except RuntimeError as e:
             if self._running:
                 log(f"could not set label {control_id}: {e}", xbmc.LOGWARNING)
 

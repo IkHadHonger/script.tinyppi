@@ -2,6 +2,8 @@
 
 """Sanitized Jellyfin sessions using Jellyfin for Kodi's saved connection."""
 
+from __future__ import annotations
+
 import json
 import threading
 import time
@@ -161,7 +163,7 @@ class JellyfinBridge:
         # alongside a separate token header (some servers prioritize the former).
         authorization = (
             'MediaBrowser Client="TinyPPI", Device="CoreELEC", '
-            'DeviceId="tinyppi-dashboard", Version="2.15.5", Token="{}"'
+            'DeviceId="tinyppi-dashboard", Version="2.15.6", Token="{}"'
         ).format(quote(connection["token"], safe=""))
         request = Request(
             connection["address"] + path,

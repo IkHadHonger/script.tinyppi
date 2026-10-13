@@ -3,6 +3,8 @@
 
 """A one-entry memo for readings recomputed on every tick."""
 
+from __future__ import annotations
+
 from collections.abc import Hashable
 from typing import Any
 
@@ -19,7 +21,7 @@ class KeyedMemo:
     __slots__ = ("_entry",)
 
     def __init__(self) -> None:
-        self._entry: tuple | None = None
+        self._entry: tuple[Hashable, Any] | None = None
 
     def get(self, key: Hashable) -> Any:
         """Return the value held for *key*, or None."""
@@ -29,6 +31,5 @@ class KeyedMemo:
         return None
 
     def put(self, key: Hashable, value: Any) -> None:
-
         """Hold *value* for *key*, replacing the previous entry."""
         self._entry = (key, value)

@@ -8,6 +8,8 @@ Read from Kodi's InfoLabels and the side data; drawing them is
 ``ui.splash``'s job.
 """
 
+from __future__ import annotations
+
 import xbmc
 from core.maps import AUDIO_LOGO_MAP, HDR_LOGO_MAP, IMAX_LOGO_MAP
 from core.utils import info

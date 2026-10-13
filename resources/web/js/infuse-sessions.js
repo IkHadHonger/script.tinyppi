@@ -45,7 +45,7 @@
       const image = element('img', 'infuse-poster');
       image.alt = '';
       image.loading = 'lazy';
-      image.src = TinyPPI.withToken('/api/jellyfin/art?kind=primary&item=' + encodeURIComponent(session.image_item));
+      image.src = '/api/jellyfin/art?kind=primary&item=' + encodeURIComponent(session.image_item);
       hero.append(image);
     }
     const heading = element('div', 'infuse-heading');

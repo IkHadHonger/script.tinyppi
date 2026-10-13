@@ -7,6 +7,11 @@ Shared by ``info.dvmetadata`` and ``info.dvcomposer``; ui.dvmetadata reads
 the row kinds through ``info.dvmetadata``.
 """
 
+from __future__ import annotations
+
+import math
+from typing import Any
+
 import xbmc
 
 # Row kinds for ui.dvmetadata: a heading, a name / value pair, a full-width
@@ -40,6 +45,19 @@ EMPTY = "—"
 LIVE   = "Live"
 CACHED = "Cached"
 
+# A block of the parsed side data (script.module.sidedata's JSON-shaped
+# result, e.g. the RPU or its L1): read with ``get``, formatted from object.
+Block = dict[str, Any]
+
+# A row's value: text, or a table row's cells.
+Value = str | list[str]
+# A row of the view: (kind, name, value).
+Row = tuple[str, str, Value]
+# A plain reading, shown as a ROW: (name, value).
+Pair = tuple[str, Value]
+# What a section is built from: pairs, and rows where the kind matters.
+Entry = Pair | Row
+
 # Separator in composite values ("2081 | 1000").
 _JOIN = " | "
 
@@ -64,6 +82,8 @@ def num(value: object) -> str:
 def lum(value: object) -> str:
     """Format a luminance in nits, like dvinfo (see ``info.dvinfo._fmt_lum``)."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return EMPTY
+    if not math.isfinite(value):  # NaN or Infinity from a broken payload
         return EMPTY
     if value and abs(value) < 1.0:
         return f"{value:.4f}".rstrip("0").rstrip(".")
@@ -106,5 +126,6 @@ def coords(pair: object) -> str:
         return EMPTY
     x, y = pair
     if isinstance(x, float) or isinstance(y, float):
-        return joined(f"{x:.4f}", f"{y:.4f}")
+        # scaled() keeps a missing half EMPTY, as num() does for codes.
+        return joined(scaled(x), scaled(y))
     return joined(num(x), num(y))

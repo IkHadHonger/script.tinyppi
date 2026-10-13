@@ -3,11 +3,14 @@
 
 """VS10 modes offered on the dashboard and the switches it requests."""
 
+from __future__ import annotations
+
 import threading
 
 import xbmc
 from core.log import channel
 from core.utils import info
+from web.payloads import VS10State
 
 # Modes per source type, as in the on-screen dialog (see ui.dialog_layout).
 # Format names are not translated, like in the dialog.
@@ -44,7 +47,7 @@ def _has_no_modes(key: str, hdr10plus: bool = False) -> bool:
 
 
 def _options_for(source: str, playing: bool = True,
-                 hdr10plus: bool = False) -> tuple:
+                 hdr10plus: bool = False) -> tuple[tuple[str, str], ...]:
     """Return the mode buttons for *source*.
 
     None for sources without modes (see ``_has_no_modes``) or when nothing
@@ -63,7 +66,7 @@ def _options_for(source: str, playing: bool = True,
 
 
 def vs10_state(source: str, playing: bool = True,
-               hdr10plus: bool = False) -> dict:
+               hdr10plus: bool = False) -> VS10State:
     """Return the VS10 buttons for the source and the current output."""
     return {
         "options": [{"mode": mode, "label": label}

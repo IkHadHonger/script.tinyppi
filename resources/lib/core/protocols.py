@@ -3,6 +3,8 @@
 
 """Structural types for the objects the add-on passes around."""
 
+from __future__ import annotations
+
 from typing import Protocol
 
 

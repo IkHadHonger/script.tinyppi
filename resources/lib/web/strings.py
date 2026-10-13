@@ -3,6 +3,8 @@
 
 """The dashboard's UI strings in Kodi's current language."""
 
+from __future__ import annotations
+
 import xbmc
 import xbmcaddon
 from core import settings

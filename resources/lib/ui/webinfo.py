@@ -7,6 +7,8 @@ Both run via ``RunScript`` from the settings dialog, in their own
 interpreter, so they never block the settings UI.
 """
 
+from __future__ import annotations
+
 import xbmcgui
 from core import settings
 from core.utils import localized

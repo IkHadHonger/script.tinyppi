@@ -16,9 +16,10 @@ import { chromium, webkit } from "playwright";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TOKEN = "BROWSER1";
 
-let server, browser, page, base;
+let server, browser, context, page, base;
 const problems = [];
 const posts = [];
+const addresses = [];
 
 before(async () => {
   server = spawn(process.env.PYTHON || "python3", ["-I", join(HERE, "serve.py")],
@@ -33,7 +34,7 @@ before(async () => {
   base = `http://127.0.0.1:${port}/`;
   const mobile = process.env.BROWSER === "webkit";
   browser = await (mobile ? webkit : chromium).launch();
-  const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+  context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
                                              isMobile: mobile, hasTouch: mobile,
                                              reducedMotion: "reduce" });
   await context.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
@@ -43,7 +44,9 @@ before(async () => {
     if (message.type() === "error") problems.push("console: " + message.text());
   });
   page.on("request", (request) => {
-    if (request.method() === "POST") {
+    addresses.push(request.url());
+    // The session the token buys on connect is no write.
+    if (request.method() === "POST" && !request.url().endsWith("/api/session")) {
       posts.push([new URL(request.url()).pathname, JSON.parse(request.postData() || "{}")]);
     }
   });
@@ -173,6 +176,17 @@ test("main dashboard shares its own iframe state with films and series", async (
   } finally {
     await context.close();
   }
+});
+
+test("the token travels in headers only; the stream reads with an HttpOnly session", async () => {
+  assert.ok(addresses.some((address) => address.endsWith("/api/stream")));
+  assert.deepEqual(addresses.filter((address) => /token=/i.test(address)), []);
+  const [session] = (await context.cookies(base + "api/state")).filter((cookie) => cookie.name === "tinyppi_session");
+  assert.ok(session, "the session cookie is set");
+  assert.equal(session.httpOnly, true);
+  assert.equal(session.sameSite, "Strict");
+  assert.equal(session.path, "/api/");
+  assert.equal(await page.evaluate(() => document.cookie), "");
 });
 
 test("no script errors anywhere", () => {

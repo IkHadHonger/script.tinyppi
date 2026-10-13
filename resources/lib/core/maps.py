@@ -3,6 +3,8 @@
 
 """Static lookup tables keyed on the lowercase codec or language id from Kodi."""
 
+from __future__ import annotations
+
 import json
 import os
 

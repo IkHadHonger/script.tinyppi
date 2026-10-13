@@ -1,5 +1,7 @@
 """Explicit framing permissions; never trust a URL supplied by the iframe."""
 
+from __future__ import annotations
+
 import ipaddress
 from urllib.parse import urlsplit
 

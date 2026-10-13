@@ -12,7 +12,7 @@
     card.style.removeProperty("--hero-fanart");
     card.classList.remove("has-fanart");
     if (!tag) return;
-    const url = TinyPPI.withToken("/api/art?kind=fanart&v=" + encodeURIComponent(tag));
+    const url = "/api/art?kind=fanart&v=" + encodeURIComponent(tag);
     const picture = new Image();
     picture.onload = () => {
       if (request !== generation || !picture.naturalWidth) return;

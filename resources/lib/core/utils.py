@@ -3,6 +3,8 @@
 
 """Kodi API wrappers and shared window-state helpers."""
 
+from __future__ import annotations
+
 import re
 import threading
 import time
@@ -15,6 +17,8 @@ from core import settings
 from core.constants import HOME_WINDOW_ID
 from core.log import log
 from core.protocols import PropertyTarget
+
+Reading = TypeVar("Reading", str, list[str])
 
 _DECIMAL_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
 
@@ -60,7 +64,7 @@ class read_pass:
 
     __slots__ = ("_outer",)
 
-    def __enter__(self) -> "read_pass":
+    def __enter__(self) -> read_pass:
         self._outer = getattr(_reads, "info", None)
         if self._outer is None:
             _reads.info = {}
@@ -199,13 +203,16 @@ DEFAULT_HIGHLIGHT_HOLD = 0.75
 # individually (see ``_changed_parts``).
 _WHOLE = -1
 
-# A reading: one string, or a list of cells (the metadata view's rows).
-Reading = TypeVar("Reading", str, list[str])
-
 
 def _colored(text: str, color: str) -> str:
     """Wrap non-empty *text* in Kodi color markup."""
     return f"[COLOR={color}]{text}[/COLOR]" if text else text
+
+
+def _changed_cells(before: list[str], current: list[str]) -> list[int]:
+    """Return the indices of the cells of *current* that are new or differ."""
+    return [index for index, cell in enumerate(current)
+            if index >= len(before) or before[index] != cell]
 
 
 def _changed_parts(previous: object, current: str | list[str]) -> list[int]:
@@ -217,9 +224,7 @@ def _changed_parts(previous: object, current: str | list[str]) -> list[int]:
     lined up (different number of readings, or a change of shape).
     """
     if isinstance(current, list):
-        before = previous if isinstance(previous, list) else []
-        return [index for index, cell in enumerate(current)
-                if index >= len(before) or before[index] != cell]
+        return _changed_cells(previous if isinstance(previous, list) else [], current)
     if not isinstance(previous, str):
         return [_WHOLE]
     parts  = _READING_GAP_RE.split(current)
@@ -231,7 +236,9 @@ def _changed_parts(previous: object, current: str | list[str]) -> list[int]:
             if not index % 2 and part != before[index]]
 
 
-def _colored_parts(value: Reading, parts: Collection[int], color: str) -> Reading:
+# ``Reading`` below: one string, or a list of cells (the metadata view's rows).
+def _colored_parts(value: Reading, parts: Collection[int],
+                                              color: str) -> Reading:
     """Return *value* with the parts listed in *parts* colored.
 
     Stale indices from a value of another shape are harmless: whatever set
@@ -270,7 +277,7 @@ class ChangeHighlighter:
         self._until: dict[Hashable, dict[int, float]] = {}
 
     def mark(self, key: Hashable, value: Reading, color: str,
-             now: float | None = None) -> Reading:
+                                        now: float | None = None) -> Reading:
         """Record *value* under *key* and return it with its changes colored.
 
         A value without history is returned plain, so a freshly opened view
@@ -322,7 +329,7 @@ def highlight_hold(setting_id: str) -> float:
     """
     try:
         milliseconds = settings.addon().getSettingInt(setting_id)
-    except Exception:  # missing or not an integer (Kodi raises TypeError)
+    except (TypeError, ValueError, RuntimeError):  # missing or not an integer
         milliseconds = 0
     return milliseconds / 1000.0 if milliseconds > 0 else DEFAULT_HIGHLIGHT_HOLD
 
@@ -452,7 +459,6 @@ def log_refresh_failure(view: str, exc: Exception) -> None:
 
 
 def clear_overlay_state(home: PropertyTarget) -> None:
-
     """Clear the Home-window properties that mark TinyPPI as open."""
     for prop in (PROP_RUNNING, PROP_ACTIVE, PROP_DIALOG_MODE):
         home.clearProperty(prop)
