@@ -147,20 +147,44 @@ class Handler(BaseHTTPRequestHandler):
         # Live player state must never be cached; static files and art set
         # their own policy.
         self.send_header("Cache-Control", cache)
-        headers: tuple[tuple[str, str], ...] = _SECURITY_HEADERS
-        if trusted_origins(settings.addon().getSetting("web_dashboard_trust")):
-            headers = tuple((n, v) for n, v in headers if n != "X-Frame-Options")
-        for name, value in headers + extra:
+        for name, value in self._security_headers() + extra:
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_unchanged(self, etag: str, cache: str) -> None:
+    def _security_headers(self) -> tuple[tuple[str, str], ...]:
+        """Keep fresh and cached responses consistent with trusted framing."""
+        if trusted_origins(settings.addon().getSetting("web_dashboard_trust")):
+            return tuple((n, v) for n, v in _SECURITY_HEADERS if n != "X-Frame-Options")
+        return _SECURITY_HEADERS
+
+    def _send_unchanged(self, etag: str, cache: str,
+                        extra: tuple[tuple[str, str], ...] = ()) -> None:
         """Send an empty 304 for a conditional request."""
         self.send_response(HTTPStatus.NOT_MODIFIED)
         self.send_header("ETag", etag)
         self.send_header("Cache-Control", cache)
+        for name, value in self._security_headers() + extra:
+            self.send_header(name, value)
         self.end_headers()
+
+    def _accepts_gzip(self) -> bool:
+        """Return whether the request's Accept-Encoding takes gzip.
+
+        ``gzip;q=0`` (or a q-value that does not parse) refuses it.
+        """
+        for part in self.headers.get("Accept-Encoding", "").split(","):
+            coding, _sep, params = part.partition(";")
+            if coding.strip().lower() != "gzip":
+                continue
+            name, _sep, value = params.partition("=")
+            if name.strip().lower() != "q":
+                return True
+            try:
+                return float(value) > 0
+            except ValueError:
+                return False
+        return False
 
     def _holds(self, etag: str) -> bool:
         """Return whether the request's If-None-Match matches *etag*."""
@@ -176,7 +200,8 @@ class Handler(BaseHTTPRequestHandler):
         if etag:
             extra += (("ETag", etag),)
         # Large JSON (mainly the chart history) is gzipped.
-        if len(body) >= MIN_COMPRESS and "gzip" in self.headers.get("Accept-Encoding", ""):
+        if (len(body) >= MIN_COMPRESS
+                and self._accepts_gzip()):
             body = gzip.compress(body, 6)
             extra += (("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding"))
         self._send(status, body, "application/json; charset=utf-8", extra, cache=cache)
@@ -576,10 +601,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.NOT_FOUND, "missing file")
             return
         body, packed, etag = found
-        if self._holds(etag):
-            self._send_unchanged(etag, STATIC_CACHE)
-            return
-        extra: tuple[tuple[str, str], ...] = (("ETag", etag), ("Vary", "Accept-Encoding"))
+        extra: tuple[tuple[str, str], ...] = (("Vary", "Accept-Encoding"),)
         if content_type.startswith("text/html"):
             extra += (
                 (
@@ -587,7 +609,11 @@ class Handler(BaseHTTPRequestHandler):
                     page_policy(_PAGE_POLICY, settings.addon().getSetting("web_dashboard_trust")),
                 ),
             )
-        if packed is not None and "gzip" in self.headers.get("Accept-Encoding", ""):
+        if self._holds(etag):
+            self._send_unchanged(etag, STATIC_CACHE, extra)
+            return
+        extra += (("ETag", etag),)
+        if packed is not None and self._accepts_gzip():
             body = packed
             extra += (("Content-Encoding", "gzip"),)
         self._send(HTTPStatus.OK, body, content_type, extra, cache=STATIC_CACHE)
