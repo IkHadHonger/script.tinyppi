@@ -12,6 +12,12 @@ import sys
 
 import pytest
 
+# The fork uses postponed annotations to keep CoreELEC / Kodi 21 supported.
+# Check the supported runtime before the lower conftests import the add-on.
+if sys.version_info < (3, 11):  # noqa: UP036 - guards against an older Python
+    pytest.exit(f"the tests need Python 3.11 or newer (CoreELEC / Kodi 21+), "
+                f"not {sys.version.split()[0]}", returncode=4)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path[:0] = [os.path.join(HERE, "stubs"), os.path.join(ROOT, "resources", "lib")]

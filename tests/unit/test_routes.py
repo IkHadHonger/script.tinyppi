@@ -437,6 +437,7 @@ def test_tagged_artwork_is_immutable_and_revalidates_empty(dashboard, art):
     status, headers, body = get(dashboard, "/api/art?kind=poster&v=abc",
                                 {"If-None-Match": 'W/"old", W/"abc"'})
     assert status == 304 and body == b"" and headers["ETag"] == '"abc"'
+    assert headers["X-Content-Type-Options"] == "nosniff"
     assert art == [("artwork", ("poster",))]          # the 304 read nothing
 
 
@@ -493,10 +494,25 @@ def test_static_files_are_packed_for_gzip_clients(dashboard, files):
     assert status == 200 and body == files.read_bytes() and "Content-Encoding" not in headers
 
 
+@pytest.mark.parametrize("accept, packed", [
+    ("br, gzip", True),
+    ("GZIP; level=1", True),
+    ("gzip;q=0.5", True),
+    ("gzip;q=0", False),
+    ("gzip; q=0.000", False),
+    ("gzip;q=high", False),
+    ("x-gzip, br", False),
+])
+def test_gzip_follows_the_q_value(dashboard, files, accept, packed):
+    status, headers, _ = get(dashboard, "/big.css", {"Accept-Encoding": accept})
+    assert status == 200 and ("Content-Encoding" in headers) is packed
+
+
 def test_an_unchanged_static_file_is_304(dashboard, files):
     etag = get(dashboard, "/big.css")[1]["ETag"]
     status, headers, body = get(dashboard, "/big.css", {"If-None-Match": etag})
     assert status == 304 and body == b"" and headers["ETag"] == etag
+    assert headers["X-Frame-Options"] == "SAMEORIGIN"
 
 
 def test_a_routed_file_that_is_gone_is_404(dashboard, files):
@@ -714,3 +730,18 @@ def test_a_client_leaving_frees_its_stream_slot(error):
     assert (server.claimed, server.released) == (1, 1)
     assert producer.watching == 0           # unwatched despite the failure
     assert handler.close_connection is True
+
+
+def test_cached_page_keeps_current_trusted_framing(dashboard):
+    import xbmcaddon
+    etag = get(dashboard, "/")[1]["ETag"]
+    xbmcaddon.SETTINGS["web_dashboard_trust"] = "http://100.118.20.75:8099"
+    status, headers, body = get(dashboard, "/", {"If-None-Match": etag})
+    assert status == 304 and body == b""
+    assert "X-Frame-Options" not in headers
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    assert "frame-ancestors 'self' http://100.118.20.75:8099" in headers["Content-Security-Policy"]
+    xbmcaddon.SETTINGS["web_dashboard_trust"] = ""
+    status, headers, _ = get(dashboard, "/", {"If-None-Match": etag})
+    assert status == 304 and headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert "100.118.20.75" not in headers["Content-Security-Policy"]
