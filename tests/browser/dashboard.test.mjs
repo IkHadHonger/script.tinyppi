@@ -244,6 +244,24 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
       image.onerror = () => reject(new Error("artwork did not load"));
       window.TinyPPI.loadArtwork(image, "/api/art?kind=poster&v=12345678");
     })), 1);
+    // Exercise the real poster rendering path, including asynchronous token
+    // fetches and data URLs, rather than only checking that the image loads.
+    await frame.evaluate(() => {
+      window.TinyPPI.panels.update({ playing: true, title: "Tint test",
+        art: { poster: "tint-first" }, groups: [], metrics: {} });
+    });
+    await frame.waitForFunction(() =>
+      document.getElementById("nowCard").style.getPropertyValue("--cover-accent-rgb") !== "");
+    assert.match(await box.locator("#poster").getAttribute("src"), /^data:image\//);
+    assert.ok(await box.locator("#nowCard").evaluate(element =>
+      element.style.getPropertyValue("--cover-gradient").includes("gradient(")));
+    await frame.evaluate(() => {
+      window.TinyPPI.panels.update({ playing: true, title: "Next poster",
+        art: { poster: "tint-next" }, groups: [], metrics: {} });
+    });
+    await frame.waitForFunction(() =>
+      document.getElementById("poster").dataset.artworkUrl?.includes("tint-next") &&
+      document.getElementById("nowCard").style.getPropertyValue("--cover-accent-rgb") !== "");
     const authenticated = seen.filter(request => request.headers()["x-tinyppi-token"] === TOKEN);
     assert.ok(authenticated.some(request => request.url().includes("/api/stream")));
     assert.ok(authenticated.some(request => request.url().includes("/api/art?")));

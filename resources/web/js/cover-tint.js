@@ -620,7 +620,7 @@ window.TinyPPICover = (function () {
       reading.delete(url);
       /* The page reuses one <img> and only changes its address, so what loaded
          may be the next film's poster; that one is read under its own. */
-      if (image.getAttribute("src") !== url) return null;
+      if ((image.dataset.artworkUrl || image.getAttribute("src")) !== url) return null;
       const palette = ok ? paletteFromImage(image) : null;
       palettes.set(url, palette);
       return palette;

@@ -868,3 +868,26 @@ test("when playback ends the panels are put away once and the ended title's even
   P.update(null);
   assert.ok($("nowCard").classList.contains("hidden"));
 });
+
+// Token-authenticated covers arrive asynchronously; only the newest successful
+// load may start tinting, and an error must not repaint the previous poster.
+test("poster tint waits for authenticated artwork and ignores stale or failed loads", async (t) => {
+  const { window, P } = panels(t);
+  const pending = [];
+  const shown = [];
+  window.TinyPPI.loadArtwork = () => new Promise(resolve => pending.push(resolve));
+  window.TinyPPICover = { show: (card, url) => shown.push(url) };
+  P.update(snap({ art: { poster: "first" } }));
+  P.update(snap({ art: { poster: "second" } }));
+  assert.deepEqual(shown, []);
+  pending[0](true);
+  await settle();
+  assert.deepEqual(shown, []);
+  pending[1](true);
+  await settle();
+  assert.deepEqual(shown, ["/api/art?kind=poster&v=second"]);
+  P.update(snap({ art: { poster: "failed" } }));
+  pending[2](false);
+  await settle();
+  assert.equal(shown.length, 1);
+});

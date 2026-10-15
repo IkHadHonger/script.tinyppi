@@ -238,9 +238,16 @@
       return;
     }
     const url = "/api/art?kind=poster&v=" + tag;
-    (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(el.poster, url);
+    const loading = (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(el.poster, url);
     el.artBox.classList.remove("hidden");
-    tint(url);
+    // Authenticated artwork is fetched before its data URL can be assigned.
+    if (loading && typeof loading.then === "function") {
+      loading.then((loaded) => {
+        if (loaded !== false && posterTag === tag) tint(url);
+      });
+    } else {
+      tint(url);
+    }
   }
 
   function tint(url) {

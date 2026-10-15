@@ -525,24 +525,27 @@ window.TinyPPI = (function () {
   function loadArtwork(image, url) {
     const load = {};
     artworkLoads.set(image, load);
+    image.dataset.artworkUrl = url;
     if (!url) { image.removeAttribute("src"); return; }
     if (!embeddedToken()) { image.src = url; return; }
     /* A data URL keeps decoded artwork usable by the cover's canvas and the
        fanart background, without a token in an address or a cookie. */
-    fetch(url, { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
+    return fetch(url, { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
       if (!response.ok) throw new Error("artwork refused");
       const blob = await response.blob();
       if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (artworkLoads.get(image) === load) image.src = reader.result;
-      };
-      reader.onerror = () => {
-        if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
-      };
-      reader.readAsDataURL(blob);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (artworkLoads.get(image) === load) image.src = reader.result;
+          resolve(artworkLoads.get(image) === load);
+        };
+        reader.onerror = () => reject(new Error("artwork decode failed"));
+        reader.readAsDataURL(blob);
+      });
     }).catch(() => {
       if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
+      return false;
     });
   }
 

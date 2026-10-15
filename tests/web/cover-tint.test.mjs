@@ -604,3 +604,17 @@ test("a page with neither a card nor a main area has nothing to paint", async ()
   assert.deepEqual(Object.keys(painted(card)), PAINTED);
   assert.equal(tints.length, 2);
 });
+
+// Authenticated embedded artwork has a data URL, while its cache identity is
+// still the original API address. It must be sampled just like a direct image.
+test("token-loaded data URL posters retain their API tint identity", async () => {
+  const view = tinted();
+  const image = view.canvas.poster(4, 4, () => [180, 100, 30]);
+  const url = "/api/art?kind=poster&v=token-cover";
+  image.src = "data:image/png;base64,token-artwork";
+  image.dataset.artworkUrl = url;
+  view.window.TinyPPICover.show(view.card, url, image);
+  await settle();
+  assert.ok(view.card.style.getPropertyValue("--cover-gradient"));
+  assert.ok(view.card.style.getPropertyValue("--cover-accent-rgb"));
+});
