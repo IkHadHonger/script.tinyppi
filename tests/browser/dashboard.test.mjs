@@ -454,9 +454,14 @@ test("relayed card needs only the local dashboard and keeps remote tokens separa
   const origin = 'http://100.76.102.114:8099';
   const requests = [];
   let remoteToken = false;
+  let delayedHello;
   try {
     await isolated.addInitScript(token => localStorage.setItem('tinyppi.token', token), TOKEN);
     isolated.on('request', request => requests.push(request));
+    await isolated.route('**/api/hello', async route => {
+      if (!remoteToken) delayedHello = route;
+      else await route.fulfill({json: {strings: {token_title: 'Late title'}}});
+    });
     await isolated.route('**/api/relay**', async route => {
       const request = route.request();
       assert.equal(request.headers()['x-tinyppi-token'], TOKEN);
@@ -476,9 +481,11 @@ test("relayed card needs only the local dashboard and keeps remote tokens separa
     });
     const local = await isolated.newPage();
     local.on('pageerror', error => problems.push(error.message));
-    await local.goto(base + '?' + new URLSearchParams({embedded: '1', relay: origin}) + '#live');
+    await local.goto(base + '?' + new URLSearchParams({embedded: '1', relay: origin}) + '#live', {waitUntil: 'domcontentloaded'});
     await local.locator('#status[data-state="down"]').waitFor();
     await local.evaluate(() => window.TinyPPI.askToken());
+    await delayedHello.fulfill({json: {strings: {token_title: 'Late title'}}});
+    await local.waitForFunction(() => window.TinyPPI.T.token_title === 'Late title');
     assert.match(await local.locator('#dlgTitle').textContent(), /100\.76\.102\.114/);
     await local.locator('#tokenInput').fill('REMOTE11');
     await local.locator('#dlgOk').click();

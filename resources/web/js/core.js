@@ -259,6 +259,14 @@ window.TinyPPI = (function () {
     if (window.TinyPPITheme) TinyPPITheme.strings(T);
     $("dlgTitle").textContent  = T.token_title;
     $("dlgText").textContent   = T.token_text;
+    // A delayed hello must not erase which box an already-open dialog is for.
+    if (pendingRelay) {
+      $('dlgTitle').textContent = 'Token van ' + pendingRelay;
+      $('dlgText').textContent = 'Je hoofd-Cube bewaart deze token om deze box via Tailscale te bekijken. Alleen lezen; je telefoon hoeft niet op Tailscale.';
+    } else if (relayOrigin && relayNeedsMainToken) {
+      $('dlgTitle').textContent = 'Token van je hoofd-dashboard';
+      $('dlgText').textContent = 'Vul hier de TinyPPI-token van jouw Cube in, niet die van Eric.';
+    }
     $("dlgOk").textContent     = T.save;
     $("dlgCancel").textContent = T.cancel;
   }
@@ -348,8 +356,8 @@ window.TinyPPI = (function () {
       return;
     }
     pendingRelay = '';
-    $('dlgTitle').textContent = relayOrigin ? 'Token van je hoofd-dashboard' : T.token_title;
-    $('dlgText').textContent = relayOrigin ? 'Vul hier de TinyPPI-token van jouw Cube in, niet die van Eric.' : T.token_text;
+    relayNeedsMainToken = !!relayOrigin;
+    applyChromeStrings();
     tokenInput.value = token;
     dialogEl.showModal();
     tokenInput.focus();
@@ -360,8 +368,7 @@ window.TinyPPI = (function () {
     if (!dialogEl || dialogEl.open) return;
     if (!token) { relayNeedsMainToken = true; askToken(); return; }
     pendingRelay = origin;
-    $('dlgTitle').textContent = 'Token van ' + origin;
-    $('dlgText').textContent = 'Je hoofd-Cube bewaart deze token om deze box via Tailscale te bekijken. Alleen lezen; je telefoon hoeft niet op Tailscale.';
+    applyChromeStrings();
     tokenInput.value = '';
     dialogEl.showModal();
     tokenInput.focus();
