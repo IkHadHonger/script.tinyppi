@@ -185,6 +185,7 @@ function continueTile(item) {
 }
 
 async function startContinue(item, tile, fromStart) {
+  if (TinyPPI.relayOrigin) return;
   if (resuming) return;
   resuming = item.id;
   tile.classList.add("busy");

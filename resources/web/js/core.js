@@ -20,6 +20,13 @@ window.TinyPPI = (function () {
 
   const TOKEN_KEY = "tinyppi.token";
   const DISCLOSURE_KEY = "tinyppi.disclosure.";
+  const relayOrigin = new URLSearchParams(location.search).get('relay') || '';
+  let pendingRelay = '';
+  let relayNeedsMainToken = false;
+
+  function readURL(url) {
+    return relayOrigin ? '/api/relay?' + new URLSearchParams({origin: relayOrigin, path: url}) : url;
+  }
 
   /* Chrome strings, replaced by the localized set from /api/hello.  The
      English here is only what shows in the instant before that answers. */
@@ -205,15 +212,35 @@ window.TinyPPI = (function () {
     dialogEl   = $("tokenDialog");
     tokenInput = $("tokenInput");
 
-    dialogEl.addEventListener("close", () => {
+    dialogEl.addEventListener("close", async () => {
       if (dialogEl.returnValue !== "ok") {
         /* Dismissed rather than answered.  Something has to stay pending, or
            a page whose token was only asked for by mistake never comes back. */
         if (!source) scheduleRetry(5000);
         return;
       }
+      if (pendingRelay) {
+        const origin = pendingRelay;
+        pendingRelay = '';
+        try {
+          const response = await fetch('/api/relay/token', {
+            method: 'POST', headers: {...tokenHeaders(), 'Content-Type': 'application/json'},
+            body: JSON.stringify({origin, token: tokenInput.value.trim().toUpperCase()})
+          });
+          if (response.status === 401) {
+            relayNeedsMainToken = true;
+            askToken();
+            return;
+          }
+          if (!response.ok) throw new Error('Koppeling kon niet worden opgeslagen (' + response.status + ')');
+          // The remote secret is server-side only; never replace this Cube's token.
+          location.reload();
+        } catch (error) { toast(error.message, true); }
+        return;
+      }
       token = tokenInput.value.trim().toUpperCase();
       storeToken(token);
+      relayNeedsMainToken = false;
       /* The settings tab shows which token this device holds. */
       document.dispatchEvent(new CustomEvent("tinyppi-token"));
       /* The stream rides on a session the token buys (an EventSource cannot
@@ -316,10 +343,28 @@ window.TinyPPI = (function () {
     /* The stream and /api/hello can both find out that a token is wanted, and
        within a moment of each other; the first one to ask keeps the dialog. */
     if (!dialogEl || dialogEl.open) return;
+    if (relayOrigin && !relayNeedsMainToken && token) {
+      configureRelay(relayOrigin);
+      return;
+    }
+    pendingRelay = '';
+    $('dlgTitle').textContent = relayOrigin ? 'Token van je hoofd-dashboard' : T.token_title;
+    $('dlgText').textContent = relayOrigin ? 'Vul hier de TinyPPI-token van jouw Cube in, niet die van Eric.' : T.token_text;
     tokenInput.value = token;
     dialogEl.showModal();
     tokenInput.focus();
     tokenInput.select();
+  }
+
+  function configureRelay(origin) {
+    if (!dialogEl || dialogEl.open) return;
+    if (!token) { relayNeedsMainToken = true; askToken(); return; }
+    pendingRelay = origin;
+    $('dlgTitle').textContent = 'Token van ' + origin;
+    $('dlgText').textContent = 'Je hoofd-Cube bewaart deze token om deze box via Tailscale te bekijken. Alleen lezen; je telefoon hoeft niet op Tailscale.';
+    tokenInput.value = '';
+    dialogEl.showModal();
+    tokenInput.focus();
   }
 
   /* --- stream ----------------------------------------------------------- */
@@ -457,10 +502,45 @@ window.TinyPPI = (function () {
   function connect() {
     disconnect();
     if (document.hidden || !streamEnabled) return;
+    if (relayOrigin) {
+      if (statusEl?.dataset.state !== 'live') setStatus('wait', T.connecting);
+      pollRelay();
+      return;
+    }
     setStatus("wait", T.connecting);
     if (!token || embeddedToken()) { openStream(); return; }
     const mine = attempt;
     openSession().then(() => { if (mine === attempt) openStream(); });
+  }
+
+  async function pollRelay() {
+    const mine = attempt;
+    const controller = new AbortController();
+    source = {close() { controller.abort(); }};
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    let delay = 2500;
+    try {
+      const response = await fetch(readURL('/api/state'), {
+        headers: tokenHeaders(), signal: controller.signal
+      });
+      if (mine !== attempt) return;
+      if (response.status === 401 || response.status === 409) {
+        relayNeedsMainToken = response.status === 401;
+        setStatus('down', T.token_bad);
+        return;
+      }
+      if (!response.ok) throw new Error('relay unavailable');
+      const snapshot = await response.json();
+      if (mine !== attempt) return;
+      snapshot.control = false;
+      base = snapshot;
+      deliver(snapshot);
+    } catch (_) {
+      if (mine !== attempt) return;
+      setStatus('down', T.offline);
+      delay = 15000;
+    } finally { clearTimeout(timeout); }
+    if (mine === attempt) scheduleRetry(delay);
   }
 
   /* Embedded boxes may have third-party cookies blocked. Their same-origin
@@ -529,10 +609,10 @@ window.TinyPPI = (function () {
     artworkLoads.set(image, load);
     image.dataset.artworkUrl = url;
     if (!url) { image.removeAttribute("src"); return; }
-    if (!embeddedToken()) { image.src = url; return; }
+    if (!embeddedToken() && !relayOrigin) { image.src = url; return; }
     /* A data URL keeps decoded artwork usable by the cover's canvas and the
        fanart background, without a token in an address or a cookie. */
-    return fetch(url, { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
+    return fetch(readURL(url), { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
       if (!response.ok) throw new Error("artwork refused");
       const blob = await response.blob();
       if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
@@ -748,6 +828,7 @@ window.TinyPPI = (function () {
       /* An error page may carry JSON of its own, and none of it is a hello. */
       if (!response.ok) return;
       const hello = await response.json();
+      if (relayOrigin) Object.assign(hello, {control: false, library: false, series: false});
       Object.assign(T, hello.strings || {});
       applyChromeStrings();
       if (options.onStrings) options.onStrings(T, hello);
@@ -762,6 +843,7 @@ window.TinyPPI = (function () {
      did it, false when it would not -- a page that shows a button is the page
      that has to say whether the button worked. */
   async function command(action, value) {
+    if (relayOrigin) return false;
     try {
       const response = await fetch("/api/command", {
         method: "POST",
@@ -778,14 +860,15 @@ window.TinyPPI = (function () {
 
   /* A read with the token in its header, for when reading needs it. */
   async function getJSON(url) {
-    const response = await fetch(url, { headers: tokenHeaders() });
+    const response = await fetch(readURL(url), { headers: tokenHeaders() });
     if (!response.ok) throw new Error(String(response.status));
     return response.json();
   }
 
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
-    copyReport, reportLine, command, getJSON, saveDashboardTrust, loadArtwork,
+    copyReport, reportLine, command, getJSON, saveDashboardTrust, loadArtwork, configureRelay,
+    relayOrigin,
     disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled, receiveSharedState,
     get token() { return token; }
   };

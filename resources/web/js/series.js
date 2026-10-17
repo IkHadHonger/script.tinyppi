@@ -508,6 +508,7 @@ function closeShow() {
 }
 
 async function startEpisode(episode, row, fromStart) {
+  if (TinyPPI.relayOrigin) return;
   if (startingEpisode) return;
   startingEpisode = episode.id;
   row.classList.add("busy");

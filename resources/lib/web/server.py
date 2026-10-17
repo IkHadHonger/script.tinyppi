@@ -21,15 +21,19 @@ import time
 import traceback
 from collections.abc import Callable
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from typing import cast
 
 import xbmc
 import xbmcaddon
+import xbmcvfs
 from core import settings
+from core.constants import PROFILE_DIR
 from core.log import channel
 from web import access, artwork, library, static
 from web.jellyfin import JellyfinBridge
 from web.producer import Producer
+from web.relay import Relay
 from web.routes import Handler
 
 # Maximum concurrent event streams (each holds a thread while its tab is
@@ -137,6 +141,7 @@ class _Server(ThreadingHTTPServer):
         self.producer      = producer
         self.stop_event    = stop_event
         self.token         = token
+        self.relay = Relay(Path(xbmcvfs.translatePath(PROFILE_DIR)) / "dashboard-relay.json")
         # The read session cookie's value (see web/routes.py), new with
         # every server, so a new token (which restarts it) ends old sessions.
         self.session       = secrets.token_urlsafe(32)

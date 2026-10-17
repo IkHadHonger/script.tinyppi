@@ -281,6 +281,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - base API
         route = urlparse(self.path).path
+        if route == "/api/relay":
+            # Remote credentials must never grant anonymous LAN access.
+            if self._token_holder(session=True):
+                self._serve_relay()
+            return
         if route in self.server.static_routes:
             self._serve_static(route)
             return
@@ -303,6 +308,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         route = urlparse(self.path).path
+        if route == "/api/relay/token":
+            if self._token_holder():
+                self._save_relay(payload)
+            return
         if route == "/api/session":
             # For reading, so control need not be allowed; the token must.
             if self._token_holder():
@@ -333,6 +342,8 @@ class Handler(BaseHTTPRequestHandler):
                 "version": addon.getAddonInfo("version"),
                 "main_dashboard": addon.getSetting("web_main_dashboard") == "true",
                 "dashboard_trust": trusted_origins(addon.getSetting("web_dashboard_trust")),
+                "relay_origins": self.server.relay.origins(
+                    trusted_origins(addon.getSetting("web_dashboard_trust"))),
                 # Per request, so an untrusted host name asks for the token.
                 "auth_read": self._token_to_read(),
                 "control": self.server.allow_control,
@@ -344,6 +355,36 @@ class Handler(BaseHTTPRequestHandler):
                 "strings": ui_strings(addon),
             }
         )
+
+    def _relay_allowed(self) -> list[str]:
+        addon = settings.addon()
+        if addon.getSetting("web_main_dashboard") != "true":
+            return []
+        return trusted_origins(addon.getSetting("web_dashboard_trust"))
+
+    def _serve_relay(self) -> None:
+        query = parse_qs(urlparse(self.path).query)
+        try:
+            status, body, content_type = self.server.relay.read(
+                _param(query, "origin"), _param(query, "path"), self._relay_allowed())
+            self._send(HTTPStatus(status), body, content_type)
+        except (OSError, ValueError):
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "relay configuration unavailable")
+
+    def _save_relay(self, payload: dict) -> None:
+        origin, token = payload.get("origin"), payload.get("token")
+        if not isinstance(origin, str) or not isinstance(token, str):
+            self._send_error_json(HTTPStatus.BAD_REQUEST, "origin and remote token required")
+            return
+        try:
+            self.server.relay.save(origin, token, self._relay_allowed())
+        except ValueError:
+            self._send_error_json(HTTPStatus.BAD_REQUEST, "invalid relay configuration")
+            return
+        except OSError:
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "relay could not be saved")
+            return
+        self._send_json({"ok": True})
 
     def _start_session(self) -> None:
         """Hand a token holder the read session cookie."""

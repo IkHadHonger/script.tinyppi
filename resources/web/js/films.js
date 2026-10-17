@@ -308,6 +308,7 @@ function applyFilmSearch() {
 }
 
 async function startFilm(film, tile, fromStart) {
+  if (TinyPPI.relayOrigin) return;
   if (starting) return;
   starting = film.id;
   tile.classList.add("busy");

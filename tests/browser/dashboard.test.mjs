@@ -449,6 +449,76 @@ test("main dashboard exposes unauthorized remote cards and accepts their token i
   }
 });
 
+test("relayed card needs only the local dashboard and keeps remote tokens separate", async () => {
+  const isolated = await browser.newContext();
+  const origin = 'http://100.76.102.114:8099';
+  const requests = [];
+  let remoteToken = false;
+  try {
+    await isolated.addInitScript(token => localStorage.setItem('tinyppi.token', token), TOKEN);
+    isolated.on('request', request => requests.push(request));
+    await isolated.route('**/api/relay**', async route => {
+      const request = route.request();
+      assert.equal(request.headers()['x-tinyppi-token'], TOKEN);
+      const url = new URL(request.url());
+      if (url.pathname === '/api/relay/token') {
+        assert.deepEqual(request.postDataJSON(), {origin, token: 'REMOTE11'});
+        remoteToken = true;
+        await route.fulfill({json: {ok: true}});
+      } else if (!remoteToken) {
+        await route.fulfill({status: 409, json: {error: 'remote token required'}});
+      } else if (url.searchParams.get('path') === '/api/state') {
+        await route.fulfill({json: {playing: true, control: false, title: 'Eric via Cube',
+          groups: [], metrics: {}, art: {}, vs10: {}, position: '00:01:00'}});
+      } else {
+        await route.fulfill({json: {user: 'Eric', linked: true}});
+      }
+    });
+    const local = await isolated.newPage();
+    local.on('pageerror', error => problems.push(error.message));
+    await local.goto(base + '?' + new URLSearchParams({embedded: '1', relay: origin}) + '#live');
+    await local.locator('#status[data-state="down"]').waitFor();
+    await local.evaluate(() => window.TinyPPI.askToken());
+    assert.match(await local.locator('#dlgTitle').textContent(), /100\.76\.102\.114/);
+    await local.locator('#tokenInput').fill('REMOTE11');
+    await local.locator('#dlgOk').click();
+    await local.locator('#title').filter({hasText: 'Eric via Cube'}).waitFor();
+    assert.equal(await local.evaluate(() => localStorage.getItem('tinyppi.token')), TOKEN);
+    assert.equal(await local.evaluate(() => window.TinyPPI.command('stop')), false);
+    assert.ok(requests.every(request => new URL(request.url()).origin === new URL(base).origin));
+    assert.ok(!requests.some(request => /\/api\/(stream|command|mode)/.test(request.url())));
+    assert.ok(requests.every(request => !request.url().includes('REMOTE11')));
+  } finally { await isolated.close(); }
+});
+
+test("main dashboard embeds a saved relay locally without replacing its own player", async () => {
+  const isolated = await browser.newContext();
+  const origin = 'http://100.76.102.114:8099';
+  const requests = [];
+  try {
+    await isolated.addInitScript(token => localStorage.setItem('tinyppi.token', token), TOKEN);
+    isolated.on('request', request => requests.push(request));
+    await isolated.route('**/api/hello', route => route.fulfill({json: {
+      main_dashboard: true, dashboard_trust: [origin], relay_origins: [origin],
+      control: true, library: true, series: true
+    }}));
+    await isolated.route('**/api/relay?**', route => route.fulfill({json:
+      new URL(route.request().url()).searchParams.get('path') === '/api/state' ?
+        {playing: true, control: false, title: 'Eric via Cube', groups: [], metrics: {}, art: {}, vs10: {}} :
+        {user: 'Eric', linked: true}
+    }));
+    const local = await isolated.newPage();
+    local.on('pageerror', error => problems.push(error.message));
+    await local.goto(base + '#live');
+    const remote = local.frameLocator('iframe[src*="relay="]');
+    await remote.locator('#title').filter({hasText: 'Eric via Cube'}).waitFor();
+    await local.locator('#title').filter({hasText: 'Film'}).waitFor({state: 'attached'});
+    await local.locator('iframe[src*="relay="]:not(.box-idle)').waitFor();
+    assert.ok(requests.every(request => new URL(request.url()).origin === new URL(base).origin));
+    assert.match(await local.locator('#title').textContent(), /Film/);
+  } finally { await isolated.close(); }
+});
+
 test("no script errors anywhere", () => {
   assert.deepEqual(problems, []);
 });

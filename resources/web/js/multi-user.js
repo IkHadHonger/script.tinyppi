@@ -65,7 +65,7 @@
     });
     function report() {
       user = document.querySelector('.jellyfin-user')?.textContent || user;
-      userHeading.textContent = user;
+      userHeading.textContent = user || (TinyPPI.relayOrigin ? TinyPPI.relayOrigin + ' · via deze Cube' : location.host);
       if (playing === null) {
         const idle = document.getElementById('idleCard');
         if (idle && !idle.classList.contains('hidden')) playing = false;
@@ -97,6 +97,7 @@
   const settingsCard = document.getElementById('dashboardBoxesCard');
   const tokens = document.getElementById('dashboardBoxTokens');
   let mainDashboard = false;
+  let relayOrigins = [];
   const row = document.createElement('div');
   row.className = 'user-dashboards';
   row.setAttribute('aria-label', 'Jellyfin users');
@@ -133,12 +134,15 @@
     for (const address of [location.origin, ...addresses]) {
       const frame = document.createElement('iframe');
       frame.title = 'TinyPPI · ' + new URL(address).hostname;
-      frame.src = address + '/?embedded=1#live';
+      const relayed = relayOrigins.includes(address) && address !== location.origin;
+      const frameURL = relayed ? '/?embedded=1&' + new URLSearchParams({relay: address}) + '#live' : address + '/?embedded=1#live';
+      frame.src = frameURL;
       frame.referrerPolicy = 'strict-origin-when-cross-origin';
       frame.className = 'user-dashboard box-idle';
       frame.inert = true;
       frame.setAttribute('aria-hidden', 'true');
-      const box = {frame, origin: address, label: new URL(address).hostname,
+      const box = {frame, origin: address, transportOrigin: relayed ? location.origin : address,
+        frameURL, label: new URL(address).hostname,
         updated: 0, attempted: Date.now(), playing: null, user: ''};
       boxes.push(box);
       if (address !== location.origin) {
@@ -151,9 +155,17 @@
           location.hash = 'live';
           describe();
           box.frame.scrollIntoView({block: 'start'});
-          box.frame.contentWindow.postMessage({type: 'tinyppi-ask-token'}, box.origin);
+          box.frame.contentWindow.postMessage({type: 'tinyppi-ask-token'}, box.transportOrigin);
         });
         tokens.append(button);
+        if (/^http:\/\/100\./.test(address)) {
+          const relayButton = document.createElement('button');
+          relayButton.type = 'button';
+          relayButton.className = 'setbtn';
+          relayButton.textContent = box.label + (relayed ? ' · Koppeltoken aanpassen' : ' · Bekijken via deze Cube');
+          relayButton.addEventListener('click', () => TinyPPI.configureRelay(address));
+          tokens.append(relayButton);
+        }
       }
       row.append(frame);
     }
@@ -161,7 +173,7 @@
   }
   addEventListener('message', (event) => {
     if (!event.data || event.data.type !== 'tinyppi-box') return;
-    const box = boxes.find((item) => item.origin === event.origin &&
+    const box = boxes.find((item) => item.transportOrigin === event.origin &&
       item.frame.contentWindow === event.source);
     if (!box) return;
     box.updated = Date.now();
@@ -184,6 +196,7 @@
     try {
       const hello = await TinyPPI.getJSON('/api/hello');
       mainDashboard = isMainDashboard(hello);
+      relayOrigins = hello.relay_origins || [];
       settingsCard.classList.toggle('hidden', !mainDashboard);
       const fallback = (hello.dashboard_trust || []).join('\n');
       try { input.value = localStorage.getItem(storageKey) || fallback; } catch (_) { input.value = fallback; }
@@ -212,7 +225,7 @@
     for (const box of boxes) {
       if (needsRetry(box, now)) {
         box.attempted = now;
-        box.frame.src = box.origin + '/?embedded=1#live';
+        box.frame.src = box.frameURL;
       }
     }
   }, 4000);

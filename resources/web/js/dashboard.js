@@ -520,6 +520,7 @@ function renderVs10(vs10) {
 }
 
 async function switchMode(mode, button) {
+  if (TinyPPI.relayOrigin) return;
   if (pending) return;
   pending = mode;
   for (const node of el.modes.children) node.disabled = true;

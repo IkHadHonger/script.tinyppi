@@ -63,6 +63,7 @@ async function clearResume(body) {
 /* One of the library writes, answering whether the box took it and saying so
    where it did not. */
 async function post(route, body) {
+  if (TinyPPI.relayOrigin) return false;
   try {
     const response = await fetch(route, {
       method: "POST",
