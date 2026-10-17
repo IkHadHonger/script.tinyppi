@@ -357,6 +357,9 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
     // Exercise the real poster rendering path, including asynchronous token
     // fetches and data URLs, rather than only checking that the image loads.
     await frame.evaluate(() => {
+      // Freeze the real stream before injecting poster snapshots; a live tick
+      // must not replace the test's poster while its artwork is loading.
+      window.TinyPPI.setStreamEnabled(false);
       window.TinyPPI.panels.update({ playing: true, title: "Tint test",
         art: { poster: "tint-first" }, groups: [], metrics: {} });
     });
