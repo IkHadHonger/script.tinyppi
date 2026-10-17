@@ -52,7 +52,7 @@ def test_missing_remote_token(bridge):
 def fake_remote(monkeypatch, body=b'{"playing":true,"control":true,"vs10":{"options":[1]}}',
                 status=200, content_type="application/json"):
     response = SimpleNamespace(status=status, getheader=lambda *_: content_type,
-                               read1=io.BytesIO(body).read)
+                               read1=io.BytesIO(body).read, close=lambda: None)
     calls = []
 
     class Connection:

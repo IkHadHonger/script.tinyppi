@@ -104,6 +104,7 @@ class Relay:
         url = urlsplit(origin)
         connection = http.client.HTTPConnection(url.hostname or "", url.port, timeout=2)
         timer = None
+        response = None
         try:
             # http.client neither follows redirects nor uses HTTP_PROXY / DNS here.
             connection.connect()
@@ -157,5 +158,7 @@ class Relay:
         finally:
             if timer is not None:
                 timer.cancel()
+            if response is not None:
+                response.close()
             connection.close()
             self.slots.release()
