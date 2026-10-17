@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Opt-in, read-only TinyPPI relay. Never proxy pages, redirects or commands."""
+"""Opt-in TinyPPI relay with narrowly scoped player controls, never arbitrary proxying."""
 
 from __future__ import annotations
 
@@ -95,6 +95,25 @@ class Relay:
     def read(self, origin: str, path: str, allowed: list[str]) -> tuple[int, bytes, str]:
         if not valid_origin(origin, allowed) or not valid_path(path):
             return 403, b'{"error":"relay target not allowed"}', "application/json"
+        return self._request(origin, path)
+
+    def write(self, origin: str, path: str, payload: dict,
+              allowed: list[str]) -> tuple[int, bytes, str]:
+        keys = {"/api/command": {"action", "value"}, "/api/mode": {"mode"}}
+        if (not valid_origin(origin, allowed) or path not in keys
+                or not set(payload).issubset(keys[path])):
+            return 403, b'{"error":"relay command not allowed"}', "application/json"
+        name = payload.get("action" if path == "/api/command" else "mode")
+        if not isinstance(name, str) or not name or len(name) > 64:
+            return 400, b'{"error":"invalid command"}', "application/json"
+        body = json.dumps(payload, allow_nan=False).encode("utf-8")
+        if len(body) > 1024:
+            return 400, b'{"error":"command too large"}', "application/json"
+        # Never retry a write: a lost response does not mean it was not applied.
+        return self._request(origin, path, body)
+
+    def _request(self, origin: str, path: str,
+                 body: bytes | None = None) -> tuple[int, bytes, str]:
         with self.lock:
             token = self._load().get(origin)
         if not token:
@@ -121,11 +140,19 @@ class Relay:
             timer.daemon = True
             timer.start()
             deadline = time.monotonic() + 3
-            connection.request("GET", path, headers={"X-TinyPPI-Token": token,
-                                                    "Connection": "close"})
+            headers = {"X-TinyPPI-Token": token, "Connection": "close"}
+            if body is None:
+                connection.request("GET", path, headers=headers)
+            else:
+                headers["Content-Type"] = "application/json"
+                connection.request("POST", path, body=body, headers=headers)
             response = connection.getresponse()
-            if response.status in (401, 403):
+            if response.status == 401:
                 return 409, b'{"error":"remote token required"}', "application/json"
+            if response.status == 403:
+                return 403, b'{"error":"remote control disabled or forbidden"}', "application/json"
+            if response.status in (400, 429):
+                return response.status, b'{"error":"remote command refused"}', "application/json"
             if response.status != 200:
                 return 502, b'{"error":"remote unavailable"}', "application/json"
             content_type = response.getheader("Content-Type", "").split(";")[0]
@@ -147,10 +174,6 @@ class Relay:
                 value: Unchecked = json.loads(chunks)
                 if not isinstance(value, dict):
                     raise ValueError("invalid remote data")
-                if urlsplit(path).path == "/api/state":
-                    value["control"] = False
-                    if isinstance(value.get("vs10"), dict):
-                        value["vs10"]["options"] = []
                 chunks = bytearray(json.dumps(value).encode("utf-8"))
             return 200, bytes(chunks), content_type
         except (OSError, ValueError, http.client.HTTPException):

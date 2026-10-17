@@ -520,19 +520,18 @@ function renderVs10(vs10) {
 }
 
 async function switchMode(mode, button) {
-  if (TinyPPI.relayOrigin) return;
   if (pending) return;
   pending = mode;
   for (const node of el.modes.children) node.disabled = true;
   button.classList.add("busy");
   TinyPPI.toast(T.switching);
   try {
-    const response = await fetch("/api/mode", {
+    const response = await (TinyPPI.relayOrigin ? TinyPPI.controlRequest('/api/mode', {mode}) : fetch("/api/mode", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-TinyPPI-Token": TinyPPI.token },
       body: JSON.stringify({ mode })
-    });
-    if (response.status === 401) {
+    }));
+    if (response.status === 401 || response.status === 409) {
       TinyPPI.toast(T.token_bad, true);
       TinyPPI.askToken();
     } else if (!response.ok) {

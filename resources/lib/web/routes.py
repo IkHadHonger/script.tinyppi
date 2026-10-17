@@ -312,6 +312,11 @@ class Handler(BaseHTTPRequestHandler):
             if self._token_holder():
                 self._save_relay(payload)
             return
+        if route == "/api/relay/control":
+            # A read cookie must never authorize player changes.
+            if self._token_holder():
+                self._control_relay(payload)
+            return
         if route == "/api/session":
             # For reading, so control need not be allowed; the token must.
             if self._token_holder():
@@ -370,6 +375,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send(HTTPStatus(status), body, content_type)
         except (OSError, ValueError):
             self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "relay configuration unavailable")
+
+    def _control_relay(self, payload: dict) -> None:
+        origin, path, command = payload.get("origin"), payload.get("path"), payload.get("payload")
+        if (not isinstance(origin, str) or not isinstance(path, str)
+                or not isinstance(command, dict)):
+            self._send_error_json(HTTPStatus.BAD_REQUEST, "invalid relay command")
+            return
+        try:
+            status, body, content_type = self.server.relay.write(
+                origin, path, command, self._relay_allowed())
+            self._send(HTTPStatus(status), body, content_type)
+        except (OSError, ValueError):
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "relay command unavailable")
 
     def _save_relay(self, payload: dict) -> None:
         origin, token = payload.get("origin"), payload.get("token")

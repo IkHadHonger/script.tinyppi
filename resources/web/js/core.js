@@ -262,7 +262,7 @@ window.TinyPPI = (function () {
     // A delayed hello must not erase which box an already-open dialog is for.
     if (pendingRelay) {
       $('dlgTitle').textContent = 'Token van ' + pendingRelay;
-      $('dlgText').textContent = 'Je hoofd-Cube bewaart deze token om deze box via Tailscale te bekijken. Alleen lezen; je telefoon hoeft niet op Tailscale.';
+      $('dlgText').textContent = 'Je hoofd-Cube bewaart deze token om deze box via Tailscale te bekijken en bedienen. Je telefoon hoeft niet op Tailscale.';
     } else if (relayOrigin && relayNeedsMainToken) {
       $('dlgTitle').textContent = 'Token van je hoofd-dashboard';
       $('dlgText').textContent = 'Vul hier de TinyPPI-token van jouw Cube in, niet die van Eric.';
@@ -539,7 +539,6 @@ window.TinyPPI = (function () {
       if (!response.ok) throw new Error('relay unavailable');
       const snapshot = await response.json();
       if (mine !== attempt) return;
-      snapshot.control = false;
       base = snapshot;
       deliver(snapshot);
     } catch (_) {
@@ -835,7 +834,7 @@ window.TinyPPI = (function () {
       /* An error page may carry JSON of its own, and none of it is a hello. */
       if (!response.ok) return;
       const hello = await response.json();
-      if (relayOrigin) Object.assign(hello, {control: false, library: false, series: false});
+      if (relayOrigin) Object.assign(hello, {library: false, series: false});
       Object.assign(T, hello.strings || {});
       applyChromeStrings();
       if (options.onStrings) options.onStrings(T, hello);
@@ -850,19 +849,26 @@ window.TinyPPI = (function () {
      did it, false when it would not -- a page that shows a button is the page
      that has to say whether the button worked. */
   async function command(action, value) {
-    if (relayOrigin) return false;
     try {
-      const response = await fetch("/api/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json",
-                   "X-TinyPPI-Token": token },
-        body: JSON.stringify({ action, value })
-      });
-      if (response.status === 401) { toast(T.token_bad, true); askToken(); return false; }
+      const response = await controlRequest('/api/command', {action, value});
+      if (response.status === 401 || response.status === 409) {
+        toast(T.token_bad, true); askToken(); return false;
+      }
       return response.ok;
     } catch (_) {
       return false;
     }
+  }
+
+  async function controlRequest(path, payload) {
+    const response = await fetch(relayOrigin ? '/api/relay/control' : path, {
+      method: 'POST', headers: {'Content-Type': 'application/json', ...tokenHeaders()},
+      body: JSON.stringify(relayOrigin ? {origin: relayOrigin, path, payload} : payload)
+    });
+    if (relayOrigin && (response.status === 401 || response.status === 409)) {
+      relayNeedsMainToken = response.status === 401;
+    }
+    return response;
   }
 
   /* A read with the token in its header, for when reading needs it. */
@@ -875,7 +881,7 @@ window.TinyPPI = (function () {
   return {
     T, $, boot, toast, setStatus, fmtNits, renderValue, plainValue, askToken,
     copyReport, reportLine, command, getJSON, saveDashboardTrust, loadArtwork, configureRelay,
-    relayOrigin,
+    relayOrigin, controlRequest,
     disclosureState, setDisclosureState, forgetDisclosure, bindDisclosure, setStreamEnabled, receiveSharedState,
     get token() { return token; }
   };

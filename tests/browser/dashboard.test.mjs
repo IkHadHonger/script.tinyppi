@@ -470,11 +470,14 @@ test("relayed card needs only the local dashboard and keeps remote tokens separa
         assert.deepEqual(request.postDataJSON(), {origin, token: 'REMOTE11'});
         remoteToken = true;
         await route.fulfill({json: {ok: true}});
+      } else if (url.pathname === '/api/relay/control') {
+        assert.equal(request.postDataJSON().origin, origin);
+        await route.fulfill({json: {ok: true}});
       } else if (!remoteToken) {
         await route.fulfill({status: 409, json: {error: 'remote token required'}});
       } else if (url.searchParams.get('path') === '/api/state') {
-        await route.fulfill({json: {playing: true, control: false, title: 'Eric via Cube',
-          groups: [], metrics: {}, art: {}, vs10: {}, position: '00:01:00'}});
+        await route.fulfill({json: {playing: true, control: true, title: 'Eric via Cube',
+          groups: [], metrics: {}, art: {}, vs10: {output: 'DV', options: [{mode: 'hdr10', label: 'HDR10'}]}, position: '00:01:00'}});
       } else {
         await route.fulfill({json: {user: 'Eric', linked: true}});
       }
@@ -491,7 +494,28 @@ test("relayed card needs only the local dashboard and keeps remote tokens separa
     await local.locator('#dlgOk').click();
     await local.locator('#title').filter({hasText: 'Eric via Cube'}).waitFor();
     assert.equal(await local.evaluate(() => localStorage.getItem('tinyppi.token')), TOKEN);
-    assert.equal(await local.evaluate(() => window.TinyPPI.command('stop')), false);
+    for (const [action, value] of [['playpause', null], ['stop', null], ['seek', 10],
+      ['volume_up', null], ['subtitle', 1], ['audio', 0], ['chapter_next', null]]) {
+      assert.equal(await local.evaluate(([action, value]) => window.TinyPPI.command(action, value), [action, value]), true);
+    }
+    assert.equal(await local.evaluate(async () =>
+      (await window.TinyPPI.controlRequest('/api/mode', {mode: 'hdr10'})).ok), true);
+    const controls = requests.filter(request => request.url().endsWith('/api/relay/control'));
+    assert.equal(controls.length, 8);
+    assert.deepEqual(controls[0].postDataJSON(), {origin, path: '/api/command', payload: {action: 'playpause', value: null}});
+    assert.deepEqual(controls[7].postDataJSON(), {origin, path: '/api/mode', payload: {mode: 'hdr10'}});
+    await local.locator('#nowCard .control-toggle').click();
+    await Promise.all([
+      local.waitForRequest(request => request.url().endsWith('/api/relay/control') &&
+        request.postDataJSON().payload.action === 'playpause'),
+      local.locator('button[data-label="playpause"]').click()
+    ]);
+    await local.locator('#vs10Card').evaluate(node => { node.open = true; });
+    await Promise.all([
+      local.waitForRequest(request => request.url().endsWith('/api/relay/control') &&
+        request.postDataJSON().path === '/api/mode'),
+      local.locator('#vs10Card button[data-mode="hdr10"]').click()
+    ]);
     assert.ok(requests.every(request => new URL(request.url()).origin === new URL(base).origin));
     assert.ok(!requests.some(request => /\/api\/(stream|command|mode)/.test(request.url())));
     assert.ok(requests.every(request => !request.url().includes('REMOTE11')));
