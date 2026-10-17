@@ -166,9 +166,13 @@ test("a pointer drags the bar, and the box hears once, where it let go", async (
   const held = await handset.evaluate(() => ({
     dots: document.querySelectorAll(".chapter-dot").length,
     clock: document.getElementById("tElapsed").textContent,
+    percent: parseFloat(document.getElementById("bar").style.width),
   }));
   assert.equal(held.dots, 3, "every chapter while the finger is on the bar");
-  assert.equal(held.clock, "01:12:00", "and the clock with it");
+  // Browser pointer coordinates are rounded to physical pixels. The clock
+  // must follow the actual fill, rather than an idealised exactly-60% point.
+  const seconds = held.clock.split(":").reduce((sum, part) => sum * 60 + Number(part), 0);
+  assert.ok(Math.abs(seconds - 7200 * held.percent / 100) <= 1, "the clock follows the fill");
   assert.deepEqual(sent, [], "nothing is asked of the box mid-drag");
 
   const asked = handset.waitForRequest((request) =>
