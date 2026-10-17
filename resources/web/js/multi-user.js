@@ -57,6 +57,12 @@
     let playing = null;
     let snapshot = null;
     let user = '';
+    addEventListener('message', (event) => {
+      // Only the actual embedding parent may open this box's local dialog.
+      // No credentials cross the frame boundary.
+      if (target && event.source === parent && event.origin === target &&
+          event.data?.type === 'tinyppi-ask-token') TinyPPI.askToken();
+    });
     function report() {
       user = document.querySelector('.jellyfin-user')?.textContent || user;
       userHeading.textContent = user;
@@ -66,6 +72,8 @@
         else if (document.getElementById('title').textContent !== '—') playing = true;
       }
       if (target) parent.postMessage({type: 'tinyppi-box', playing, user,
+        needsToken: document.getElementById('statusText').textContent === TinyPPI.T.token_bad,
+        tokenDialogOpen: !!document.getElementById('tokenDialog')?.open,
         connected: document.getElementById('status').dataset.state === 'live',
         height: Math.ceil(main.getBoundingClientRect().height +
           navigation.getBoundingClientRect().height +
@@ -100,7 +108,7 @@
     const now = Date.now();
     const active = boxes.filter((box) => activeBox(box, now));
     for (const box of boxes) {
-      const visible = active.includes(box);
+      const visible = active.includes(box) || box.authorizing || box.needsToken || box.tokenDialogOpen;
       box.frame.classList.toggle('box-idle', !visible);
       box.frame.inert = !visible;
       box.frame.setAttribute('aria-hidden', String(!visible));
@@ -118,15 +126,6 @@
     // The outer dashboard must not consume a second server slot.
     TinyPPI.setStreamEnabled(addresses.length === 0);
     tokens.replaceChildren();
-    for (const address of addresses) {
-      const link = document.createElement('a');
-      link.className = 'setbtn';
-      link.href = address + '/#settings';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = new URL(address).hostname + ' · Token invoeren op deze box';
-      tokens.append(link);
-    }
     for (const box of boxes) box.frame.remove();
     boxes = [];
     document.documentElement.classList.toggle('tinyppi-multi', addresses.length > 0);
@@ -142,6 +141,20 @@
       const box = {frame, origin: address, label: new URL(address).hostname,
         updated: 0, attempted: Date.now(), playing: null, user: ''};
       boxes.push(box);
+      if (address !== location.origin) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'setbtn';
+        button.textContent = box.label + ' · Token invoeren in dit dashboard';
+        button.addEventListener('click', () => {
+          box.authorizing = true;
+          location.hash = 'live';
+          describe();
+          box.frame.scrollIntoView({block: 'start'});
+          box.frame.contentWindow.postMessage({type: 'tinyppi-ask-token'}, box.origin);
+        });
+        tokens.append(button);
+      }
       row.append(frame);
     }
     describe();
@@ -154,6 +167,9 @@
     box.updated = Date.now();
     box.playing = event.data.playing;
     box.connected = event.data.connected;
+    box.needsToken = event.data.needsToken === true;
+    box.tokenDialogOpen = event.data.tokenDialogOpen === true;
+    if (box.tokenDialogOpen || box.connected) box.authorizing = false;
     box.user = typeof event.data.user === 'string' ? event.data.user.slice(0, 120) : '';
     const snapshot = localSnapshot(box, event, location.origin);
     if (snapshot) TinyPPI.receiveSharedState(snapshot);

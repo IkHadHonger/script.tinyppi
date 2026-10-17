@@ -8,6 +8,7 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -379,6 +380,67 @@ test("a cross-site embedded box reads live state and artwork without cookies", a
       assert.ok(!/token=/i.test(request.url()));
     }
     assert.deepEqual(await isolated.cookies(), []);
+  } finally {
+    await isolated.close();
+  }
+});
+
+test("main dashboard exposes unauthorized remote cards and accepts their token in-frame", async () => {
+  const mobile = process.env.BROWSER === "webkit";
+  const isolated = await browser.newContext({
+    viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+    isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce"
+  });
+  if (!mobile) await isolated.grantPermissions(["local-network-access"]);
+  const parentAddress = base.replace("127.0.0.1", "127.0.0.2");
+  try {
+    await isolated.addInitScript(({token, origin}) => {
+      if (location.origin === origin) localStorage.setItem("tinyppi.token", token);
+    }, {token: TOKEN, origin: new URL(parentAddress).origin});
+    await isolated.route(parentAddress + "**", async route => {
+      const url = route.request().url().replace(parentAddress, base);
+      if (url.endsWith('/api/stream')) {
+        await route.fulfill({contentType: 'text/event-stream', body: ': test parent stream\n\n'});
+        return;
+      }
+      if (url.endsWith("/api/hello")) {
+        await route.fulfill({json: {main_dashboard: true, dashboard_trust: [new URL(base).origin]}});
+      } else if (new URL(url).pathname.startsWith('/api/')) {
+        await route.fulfill({json: {playing: false, control: false}});
+      } else {
+        const path = new URL(url).pathname;
+        const contentType = path.endsWith('.js') ? 'text/javascript' :
+          path.endsWith('.css') ? 'text/css' : 'text/html';
+        try {
+          const body = await readFile(join(HERE, '../../resources/web', path === '/' ? 'index.html' : path));
+          await route.fulfill({contentType, body});
+        } catch {
+          await route.fulfill({status: 404, body: ''});
+        }
+      }
+    });
+    const parent = await isolated.newPage();
+    parent.on("pageerror", error => problems.push(error.message));
+    await parent.goto(parentAddress + "#live");
+    const selector = `iframe[src^="${base}"]`;
+    const box = parent.frameLocator(selector);
+    await box.locator('#status[data-state="down"]').waitFor({state: 'attached'});
+    await parent.locator(selector + ':not(.box-idle)').waitFor();
+    const remote = parent.frames().find(frame => frame.url().startsWith(base));
+    // A sibling cannot trigger credential UI, even using the parent's origin.
+    await remote.evaluate(origin => dispatchEvent(new MessageEvent('message', {
+      origin, source: window, data: {type: 'tinyppi-ask-token'}
+    })), new URL(parentAddress).origin);
+    assert.equal(await box.locator('#tokenDialog').evaluate(d => d.open), false);
+    await parent.evaluate(() => { location.hash = 'settings'; });
+    await parent.getByRole('button', {name: /127\.0\.0\.1 · Token invoeren in dit dashboard/}).click();
+    await box.locator('#tokenDialog[open]').waitFor();
+    await box.locator('#tokenInput').fill(TOKEN);
+    await box.locator('#dlgOk').click();
+    await box.locator('#status[data-state="live"]').waitFor();
+    await box.locator('#title').filter({hasText: 'Film'}).waitFor();
+    await parent.locator(selector + ':not(.box-idle)').waitFor();
+    assert.equal(await parent.evaluate(() => localStorage.getItem('tinyppi.token')), TOKEN);
   } finally {
     await isolated.close();
   }
