@@ -121,10 +121,11 @@ test("the chapters ahead sit on the bar, a mouse brings up the rest, a click jum
   await page.waitForFunction(() => document.querySelectorAll(".chapter-dot").length === 2);
 });
 
-test("a finger drags the bar, and the box hears once, where it let go", async () => {
+test("a pointer drags the bar, and the box hears once, where it let go", async (t) => {
   // A phone of its own: touch, and a narrow screen.
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 },
                                            hasTouch: true, isMobile: true });
+  t.after(() => phone.close());
   await phone.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
   const handset = await phone.newPage();
   const errors = [];
@@ -139,9 +140,16 @@ test("a finger drags the bar, and the box hears once, where it let go", async ()
   await handset.waitForSelector(".track.seekable");
   const bar = await handset.locator("#track").boundingBox();
   const y = bar.y + bar.height / 2;
-  const cdp = await phone.newCDPSession(handset);
-  const touch = (type, at) => cdp.send("Input.dispatchTouchEvent", {
-    type, touchPoints: type === "touchEnd" ? [] : [{ x: bar.x + bar.width * at, y }] });
+  // Chromium exposes a real touch drag through CDP. WebKit exposes taps
+  // only, so exercise the same pointer handler with its real mouse input.
+  const cdp = process.env.BROWSER === "webkit" ? null : await phone.newCDPSession(handset);
+  const touch = async (type, at) => {
+    if (cdp) return cdp.send("Input.dispatchTouchEvent", {
+      type, touchPoints: type === "touchEnd" ? [] : [{ x: bar.x + bar.width * at, y }] });
+    if (type === "touchEnd") return handset.mouse.up();
+    await handset.mouse.move(bar.x + bar.width * at, y);
+    if (type === "touchStart") await handset.mouse.down();
+  };
 
   await touch("touchStart", 0.2);
   for (let step = 1; step <= 10; step++) await touch("touchMove", 0.2 + step * 0.04);
@@ -172,7 +180,6 @@ test("a finger drags the bar, and the box hears once, where it let go", async ()
   await handset.waitForFunction(() => document.querySelectorAll(".chapter-dot").length === 2);
   assert.equal(sent.length, 1, "once");
   assert.deepEqual(errors, []);
-  await phone.close();
 });
 
 test("films: the wall, search and clearing it", async () => {
