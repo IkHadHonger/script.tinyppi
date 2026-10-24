@@ -24,6 +24,17 @@ def normalize(text, current):
     return re.sub(r'(\bprovider-name=")[^"]+', r"\g<1>" + current["provider-name"], text, count=1)
 
 
+def preserve_python_compatibility(text):
+    """Keep the fork's postponed annotations on top of upstream properties."""
+    marker = "from __future__ import annotations"
+    if marker in text:
+        return text
+    match = re.match(r'((?:#.*\n)*\n?"""[\s\S]*?"""\n)', text)
+    if not match:
+        raise RuntimeError("properties.py module header needs manual review")
+    return text[:match.end()] + "\n" + marker + "\n" + text[match.end():]
+
+
 def main():
     if git("status", "--porcelain").stdout.strip():
         raise RuntimeError("Worktree must be clean")
@@ -42,9 +53,15 @@ def main():
     current = ET.fromstring(ours).attrib
     result = git("merge", "--no-commit", "--no-ff", upstream, check=False)
     conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
-    if result.returncode and conflicts != ["addon.xml"]:
+    supported = {"addon.xml", "resources/lib/info/properties.py"}
+    if result.returncode and not set(conflicts).issubset(supported):
         raise RuntimeError("Manual merge needed: " + result.stderr + ", ".join(conflicts))
-    if conflicts:
+    if "resources/lib/info/properties.py" in conflicts:
+        path = Path("resources/lib/info/properties.py")
+        upstream_properties = git("show", f"{upstream}:{path}").stdout
+        path.write_text(preserve_python_compatibility(upstream_properties), encoding="utf-8")
+        git("add", str(path))
+    if "addon.xml" in conflicts:
         with tempfile.TemporaryDirectory() as temporary:
             paths = [Path(temporary) / str(i) for i in range(3)]
             for path, text in zip(paths, [ours, previous, theirs], strict=True):
@@ -60,9 +77,16 @@ def main():
     root = ET.fromstring(text)
     # Fork intentionally remains installable on Kodi 21; a future ABI change stops.
     dependency = root.find("requires/import[@addon='xbmc.python']")
-    if dependency.attrib["version"] != "3.0.0":
-        raise RuntimeError("Kodi Python ABI changed; compatibility review required")
-    Path("addon.xml").write_text(text, encoding="utf-8")
+    if dependency is None:
+        raise RuntimeError("Kodi Python dependency disappeared; compatibility review required")
+    # This fork targets Kodi 21 / CoreELEC 21.3 as well as Piers. The complete
+    # suite below is the compatibility gate; do not inherit upstream's 3.1
+    # declaration while the fork remains valid on Python 3.11.
+    dependency.attrib["version"] = "3.0.0"
+    text = ET.tostring(root, encoding="unicode")
+    if not text.startswith("<?xml"):
+        text = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + text
+    Path("addon.xml").write_text(text + ("\n" if not text.endswith("\n") else ""), encoding="utf-8")
     bridge = Path("resources/lib/web/jellyfin.py")
     bridge.write_text(
         re.sub(r'Version="[\d.]+"', f'Version="{new}"', bridge.read_text(encoding="utf-8")),
