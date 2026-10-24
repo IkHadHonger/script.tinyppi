@@ -88,6 +88,12 @@ def main():
             if merged.returncode:
                 raise RuntimeError("Addon metadata conflict needs manual review")
             Path("addon.xml").write_text(merged.stdout, encoding="utf-8")
+    awards = Path("resources/data/awards.json")
+    if awards.exists():
+        # Upstream's generated single-line dataset may carry whitespace after
+        # the JSON value; keep the payload byte-for-byte and normalize its EOF.
+        awards.write_text(awards.read_text(encoding="utf-8").rstrip() + "\n", encoding="utf-8")
+        git("add", str(awards))
     text = Path("addon.xml").read_text(encoding="utf-8")
     highest = max(version(ours), version(theirs))
     new = ".".join(map(str, (*highest[:2], highest[2] + 1)))
