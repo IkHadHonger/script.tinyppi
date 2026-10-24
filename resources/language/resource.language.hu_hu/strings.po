@@ -1004,16 +1004,16 @@ msgid "In / drop / out"
 msgstr "Dobott / kodi fps"
 
 msgctxt "#32249"
-msgid "Processor"
-msgstr "Processzor"
+msgid "CPU cores"
+msgstr "CPU magok"
 
 msgctxt "#32250"
 msgid "Temperature"
 msgstr "Hőmérséklet"
 
 msgctxt "#32251"
-msgid "Memory usage"
-msgstr "Memória használat"
+msgid "CPU / RAM"
+msgstr "CPU / RAM"
 
 msgctxt "#32252"
 msgid "Player cache"
@@ -1502,3 +1502,59 @@ msgstr "Folyamatjelző sáv"
 msgctxt "#32369"
 msgid "Show chapter markers"
 msgstr "Fejezetjelölők megjelenítése"
+
+msgctxt "#32370"
+msgid "Overview"
+msgstr "Áttekintés"
+
+msgctxt "#32372"
+msgid "My rating"
+msgstr "Saját értékelés"
+
+msgctxt "#32373"
+msgid "Top 250 · #%s"
+msgstr "Top 250 · %s. hely"
+
+msgctxt "#32378"
+msgid "Cast"
+msgstr "Szereplők"
+
+msgctxt "#32381"
+msgid "Show more"
+msgstr "Több megjelenítése"
+
+msgctxt "#32382"
+msgid "Show less"
+msgstr "Kevesebb megjelenítése"
+
+msgctxt "#32383"
+msgid "Ratings"
+msgstr "Értékelések"
+
+msgctxt "#32384"
+msgid "MDBList API key"
+msgstr "MDBList API-kulcs"
+
+msgctxt "#32385"
+msgid "With a free key from mdblist.com (Preferences → API), the overview card shows the ratings MDBList gathers for a film: IMDb, TMDb, Trakt, Letterboxd, Rotten Tomatoes, Metacritic and more. To ask, the film's IMDb or TMDb id is sent to MDBList. Left empty, the card shows the ratings Kodi's library holds."
+msgstr "Az mdblist.com ingyenes kulcsával (Preferences → API) az Áttekintés kártya egy filmnél az MDBList által gyűjtött értékeléseket mutatja: IMDb, TMDb, Trakt, Letterboxd, Rotten Tomatoes, Metacritic és mások. Ehhez a film IMDb- vagy TMDb-azonosítója az MDBList-hez kerül. Üresen hagyva a kártya a Kodi médiatárának értékeléseit mutatja."
+
+msgctxt "#32386"
+msgid "Director"
+msgstr "Rendező"
+
+msgctxt "#32387"
+msgid "WhatsOn API key (optional)"
+msgstr "WhatsOn API-kulcs (nem kötelező)"
+
+msgctxt "#32388"
+msgid "For every film, the overview card asks WhatsOn (whatson-api.onrender.com, free for non-commercial use) whether Rotten Tomatoes certified it: a seal on the Tomatometer for Certified Fresh, on the Popcornmeter for Verified Hot. Where neither MDBList nor the library has one of the two ratings, WhatsOn's is shown. Without a key WhatsOn answers 40 times an hour and 200 times a day; with a free key from its author (pierrevano.github.io), 200 times an hour and 1,000 a day. To ask, the film's IMDb or TMDb id is sent to WhatsOn, once per film."
+msgstr "Az Áttekintés kártya minden filmnél megkérdezi a WhatsOn-t (whatson-api.onrender.com, nem kereskedelmi célra ingyenes), kitüntette-e a Rotten Tomatoes: pecsét a Tomatometeren a „Certified Fresh”, a Popcornmeteren a „Verified Hot” jelzésért. Ha a két értékelés egyike sem az MDBList-ben, sem a médiatárban nincs meg, a WhatsOn-é látszik. Kulcs nélkül a WhatsOn óránként 40, naponta 200 kérésre válaszol, a szerzőtől kérhető ingyenes kulccsal (pierrevano.github.io) óránként 200, naponta 1000 kérésre. Ehhez a film IMDb- vagy TMDb-azonosítója a WhatsOn-hoz kerül, filmenként egyszer."
+
+msgctxt "#32389"
+msgid "%s won"
+msgstr "%s díj"
+
+msgctxt "#32390"
+msgid "%s nominated"
+msgstr "%s jelölés"

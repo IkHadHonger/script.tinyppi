@@ -20,6 +20,7 @@ import time
 import zlib
 
 import xbmc
+from core.log import channel
 from core.utils import (
     PROP_EFFECTIVE_HDR_TYPE,
     PROP_HDR10PLUS_PRESENT,
@@ -42,9 +43,11 @@ from info.publish import (
     publish_scene_properties,
     publish_static_properties,
 )
+from web.mdblist import api_key, asking, with_mdblist
 from web.payloads import (
     Chapter,
     Controls,
+    Credits,
     FrameSize,
     Group,
     GroupRow,
@@ -52,6 +55,7 @@ from web.payloads import (
     MetadataRow,
     Metrics,
     PlayingSnapshot,
+    Ratings,
     Snapshot,
 )
 from web.player import (
@@ -62,10 +66,15 @@ from web.player import (
     is_live_tv,
     player_controls,
 )
+from web.ratings import no_ratings, playing_ratings
 from web.rows import GROUPS, finish_time, is_dv_source, overlay_rows, render
 from web.session import SessionLog
-from web.values import clean_value, numbers
+from web.values import clean_value, name_list, numbers, plain_text
 from web.vs10 import vs10_state
+from web.whatson import api_key as whatson_key
+from web.whatson import with_whatson
+
+_log = channel("web")
 
 # Home property with the source HDR type (from publish_hdr_type).
 _PROP_HDR_TYPE = "TinyPPI.HdrType"
@@ -118,7 +127,41 @@ _EXTRA_INFOLABELS = (
     ("Show",                "VideoPlayer.TVShowTitle"),
     ("Season",              "VideoPlayer.Season"),
     ("Episode",             "VideoPlayer.Episode"),
+    # The card under it: the slogan and what the title is about, and who
+    # made it (see _credits).  Its genre is the card above's.
+    ("Tagline",             "VideoPlayer.Tagline"),
+    ("Plot",                "VideoPlayer.Plot"),
+    ("Director",            "VideoPlayer.Director"),
+    ("Cast",                "VideoPlayer.Cast"),
+    ("Studio",              "VideoPlayer.Studio"),
 )
+
+# How many names of each the page keeps (see name_list): the genres and the
+# studio for the card of what is playing; every director and the cast's first
+# twenty, for the overview card's credits, the cast said to have more past
+# them.  The genres read as a kind of film rather than a list of names, and
+# the studio stands for the film alone.
+_NAMES: dict[str, int | None] = {"genres": 2, "directors": None, "cast": 20, "studios": 1}
+
+
+def _genre(values: dict[str, str]) -> str:
+    """Return the playing title's first genres, as Kodi writes them."""
+    genres, _more = name_list(values.get("Genre", ""), _NAMES["genres"])
+    return " / ".join(genres)
+
+
+def _credits(values: dict[str, str]) -> Credits:
+    """Return who made the playing title: its studios and directors for the
+    card of what is playing, its cast for the overview card.
+
+    An episode's studios are its show's, and its cast its own guests and
+    then the show's: Kodi keeps them so.
+    """
+    directors, _more = name_list(values.get("Director", ""), _NAMES["directors"])
+    cast, cast_more = name_list(values.get("Cast", ""), _NAMES["cast"])
+    studios, _more = name_list(values.get("Studio", ""), _NAMES["studios"])
+    return {"directors": directors, "cast": cast, "cast_more": cast_more, "studios": studios}
+
 
 # Presence flags (true / false / '') as markers; the browser shows icons,
 # copied reports use localized words.
@@ -280,6 +323,18 @@ class SnapshotBuilder:
         self._chapters: list[Chapter] = []
         self._chapters_for: tuple[str, str] | None = None
         self._chapters_at = 0.0
+        # The title's ratings, the (file, length) they were read for, and
+        # whether Kodi could say what was playing when they were.
+        self._ratings: Ratings = no_ratings()
+        self._ratings_for: tuple[str, str] | None = None
+        self._ratings_at = 0.0
+        self._ratings_known = False
+        # The MDBList and the WhatsOn API keys and when they were read: once
+        # a static interval, so a key given mid-film is asked with within a
+        # second.
+        self._mdblist_key = ""
+        self._whatson_key = ""
+        self._rating_settings_at = 0.0
 
     def _refresh(self) -> None:
         """Recompute the readings into the sink."""
@@ -429,6 +484,58 @@ class SnapshotBuilder:
             self._chapters = chapter_list(title[1])
         return self._chapters
 
+    def _rating_info(self, values: dict[str, str]) -> Ratings:
+        """Return the title's ratings, read once per title.
+
+        Read again on the static interval only while Kodi cannot yet say
+        what is playing (see ``playing_ratings``): a title with no ratings
+        is asked once.
+        """
+        title = (values.get("Filename", ""), values.get("PlayerDuration", ""))
+        now = time.monotonic()
+        retry = not self._ratings_known and now - self._ratings_at >= self.STATIC_INTERVAL
+        if title != self._ratings_for or retry:
+            self._ratings_for = title
+            self._ratings_at = now
+            found = playing_ratings()
+            self._ratings_known = found is not None
+            self._ratings = found if found is not None else no_ratings()
+            if found is not None:
+                self._tell_ratings(found)
+        return self._ratings
+
+    def _tell_ratings(self, found: Ratings) -> None:
+        """Log, once a title, what its ratings can be asked for by, so a
+        card short of MDBList's or WhatsOn's says why in Kodi's log."""
+        ids = ", ".join(f"{name} {ident}" for name, ident in found["ids"].items()) or "none"
+        held = ", ".join(entry["source"] for entry in found["ratings"]) or "none"
+        _log(f"Ratings of the playing title: ids {ids}; the library's: {held}; "
+             f"MDBList key {'given' if self._mdblist_key else 'empty'}, "
+             f"WhatsOn key {'given' if self._whatson_key else 'empty'}", xbmc.LOGINFO)
+
+    def _rating_settings(self) -> tuple[str, str]:
+        """Return the MDBList and the WhatsOn API keys ("" for none), read
+        again once a static interval."""
+        now = time.monotonic()
+        if now - self._rating_settings_at >= self.STATIC_INTERVAL:
+            self._rating_settings_at = now
+            self._mdblist_key = api_key()
+            self._whatson_key = whatson_key()
+        return self._mdblist_key, self._whatson_key
+
+    def _shown_ratings(self, values: dict[str, str]) -> Ratings:
+        """Return the title's ratings: the library's, MDBList's over them,
+        and from WhatsOn Rotten Tomatoes' certificates and the ratings both
+        lack.
+
+        WhatsOn waits for MDBList's answer, which may bring those ratings.
+        """
+        key, whatson = self._rating_settings()
+        ratings = with_mdblist(self._rating_info(values), key=key)
+        if not asking(key, ratings["ids"]):
+            ratings = with_whatson(ratings, key=whatson)
+        return ratings
+
     def _active_tracks(self) -> dict[str, str]:
         """Return the active tracks from the last static refresh."""
         return self._track_state
@@ -465,6 +572,13 @@ class SnapshotBuilder:
             self._chapters = []
             self._chapters_for = None
             self._chapters_at = 0.0
+            self._ratings = no_ratings()
+            self._ratings_for = None
+            self._ratings_at = 0.0
+            self._ratings_known = False
+            self._mdblist_key = ""
+            self._whatson_key = ""
+            self._rating_settings_at = 0.0
             # End the session but keep its figures for the idle page.
             self.session.end()
             idle: IdleSnapshot = {
@@ -520,6 +634,9 @@ class SnapshotBuilder:
         if not detail:
             return None
 
+        # Only for a snapshot somebody is watching: it costs JSON-RPC.
+        ratings = self._shown_ratings(values)
+        credits = _credits(values)
         snapshot: PlayingSnapshot = {
             "seq":       self._sequence,
             "playing":   True,
@@ -542,10 +659,23 @@ class SnapshotBuilder:
             "art":       _art_tags(),
             "media":     {
                 "year":    values.get("Year", ""),
-                "genre":   values.get("Genre", ""),
+                "genre":   _genre(values),
                 "show":    values.get("Show", ""),
                 "season":  values.get("Season", ""),
                 "episode": values.get("Episode", ""),
+                "tagline": plain_text(values.get("Tagline", "")),
+                "plot":    plain_text(values.get("Plot", "")),
+                "ratings":    ratings["ratings"],
+                "mpaa":       ratings["mpaa"],
+                "age":        ratings["age"],
+                "age_level":  ratings["age_level"],
+                "userrating": ratings["userrating"],
+                "top250":     ratings["top250"],
+                "awards":     ratings["awards"],
+                "directors":      credits["directors"],
+                "cast":           credits["cast"],
+                "cast_more":      credits["cast_more"],
+                "studios":        credits["studios"],
             },
             "controls":  self._player_controls(control),
             "chapters":  chapters,

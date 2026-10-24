@@ -1004,16 +1004,16 @@ msgid "In / drop / out"
 msgstr "In / Drop / Out"
 
 msgctxt "#32249"
-msgid "Processor"
-msgstr "Prozessor"
+msgid "CPU cores"
+msgstr "CPU Kerne"
 
 msgctxt "#32250"
 msgid "Temperature"
 msgstr "Temperatur"
 
 msgctxt "#32251"
-msgid "Memory usage"
-msgstr "Speichernutzung"
+msgid "CPU / RAM"
+msgstr "CPU / RAM"
 
 msgctxt "#32252"
 msgid "Player cache"
@@ -1502,3 +1502,59 @@ msgstr "Fortschrittsbalken"
 msgctxt "#32369"
 msgid "Show chapter markers"
 msgstr "Kapitelmarken anzeigen"
+
+msgctxt "#32370"
+msgid "Overview"
+msgstr "Überblick"
+
+msgctxt "#32372"
+msgid "My rating"
+msgstr "Eigene Bewertung"
+
+msgctxt "#32373"
+msgid "Top 250 · #%s"
+msgstr "Top 250 · Platz %s"
+
+msgctxt "#32378"
+msgid "Cast"
+msgstr "Darsteller"
+
+msgctxt "#32381"
+msgid "Show more"
+msgstr "Mehr anzeigen"
+
+msgctxt "#32382"
+msgid "Show less"
+msgstr "Weniger anzeigen"
+
+msgctxt "#32383"
+msgid "Ratings"
+msgstr "Bewertungen"
+
+msgctxt "#32384"
+msgid "MDBList API key"
+msgstr "MDBList-API-Schlüssel"
+
+msgctxt "#32385"
+msgid "With a free key from mdblist.com (Preferences → API), the overview card shows the ratings MDBList gathers for a film: IMDb, TMDb, Trakt, Letterboxd, Rotten Tomatoes, Metacritic and more. To ask, the film's IMDb or TMDb id is sent to MDBList. Left empty, the card shows the ratings Kodi's library holds."
+msgstr "Mit einem kostenlosen Schlüssel von mdblist.com (Preferences → API) zeigt die Überblick-Karte für einen Film die Bewertungen, die MDBList sammelt: IMDb, TMDb, Trakt, Letterboxd, Rotten Tomatoes, Metacritic und mehr. Dafür wird die IMDb- oder TMDb-ID des Films an MDBList geschickt. Leer gelassen zeigt die Karte die Bewertungen aus Kodis Mediathek."
+
+msgctxt "#32386"
+msgid "Director"
+msgstr "Regisseur"
+
+msgctxt "#32387"
+msgid "WhatsOn API key (optional)"
+msgstr "WhatsOn-API-Schlüssel (optional)"
+
+msgctxt "#32388"
+msgid "For every film, the overview card asks WhatsOn (whatson-api.onrender.com, free for non-commercial use) whether Rotten Tomatoes certified it: a seal on the Tomatometer for Certified Fresh, on the Popcornmeter for Verified Hot. Where neither MDBList nor the library has one of the two ratings, WhatsOn's is shown. Without a key WhatsOn answers 40 times an hour and 200 times a day; with a free key from its author (pierrevano.github.io), 200 times an hour and 1,000 a day. To ask, the film's IMDb or TMDb id is sent to WhatsOn, once per film."
+msgstr "Für jeden Film fragt die Überblick-Karte WhatsOn (whatson-api.onrender.com, kostenlos für nicht-kommerzielle Nutzung), ob Rotten Tomatoes ihn ausgezeichnet hat: ein Siegel am Tomatometer für „Certified Fresh“, am Popcornmeter für „Verified Hot“. Fehlt eine der beiden Bewertungen bei MDBList und in der Mediathek, wird die von WhatsOn gezeigt. Ohne Schlüssel antwortet WhatsOn 40-mal pro Stunde und 200-mal pro Tag, mit einem kostenlosen Schlüssel vom Betreiber (pierrevano.github.io) 200-mal pro Stunde und 1.000-mal pro Tag. Dafür wird die IMDb- oder TMDb-ID des Films an WhatsOn geschickt, einmal pro Film."
+
+msgctxt "#32389"
+msgid "%s won"
+msgstr "%s gewonnen"
+
+msgctxt "#32390"
+msgid "%s nominated"
+msgstr "%s nominiert"

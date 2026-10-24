@@ -123,6 +123,63 @@ class MetadataRow(TypedDict):
     cells: NotRequired[list[str]]
 
 
+class Rating(TypedDict):
+    """One source's rating of the playing title, out of ten."""
+
+    # imdb, tmdb, trakt, tvdb, metacritic, or whatever else an NFO names.
+    source: str
+    rating: float
+    # 0 where the library has no count.
+    votes: int
+    # Rotten Tomatoes' Certified Fresh (rottentomatoes) or Verified Hot
+    # (popcorn), as WhatsOn has it (see web.whatson); sent only when true.
+    certified: NotRequired[bool]
+
+
+class Award(TypedDict):
+    """One of the big awards the playing title won or was nominated for
+    (see web.awards)."""
+
+    # oscar, globe, bafta or emmy.
+    award: str
+    # What it won, by category and year ("Visual Effects (2015)").
+    won: list[str]
+    # How many more it was nominated for and did not win.
+    nominated: int
+
+
+class Credits(TypedDict):
+    """Who made the playing title, as Kodi orders them (see
+    web.values.name_list): every director, the first studio alone, and the
+    cast's first twenty with whether there are more."""
+
+    directors: list[str]
+    cast: list[str]
+    cast_more: bool
+    studios: list[str]
+
+
+class Ratings(TypedDict):
+    """The playing title's ratings (web/ratings.py); empty or 0 where unknown."""
+
+    ratings: list[Rating]
+    # The age rating as the scraper wrote it ("FSK 12", "Rated PG-13"), the
+    # mark its shield wears ("fsk12", "mpa_pg13", "bbfc_15"; "" for none) and
+    # the level written beside it ("12", "PG-13", "MA").
+    mpaa: str
+    age: str
+    age_level: str
+    # The reader's own, 1 to 10.
+    userrating: int
+    # The place in the IMDb Top 250.
+    top250: int
+    # The big awards it won or was nominated for (see web.awards).
+    awards: list[Award]
+    # A film's IMDb and TMDb ids ("imdb", "tmdb"), for MDBList to be asked
+    # by (see web.mdblist); {} for an episode.  Not sent to the page.
+    ids: dict[str, str]
+
+
 class Media(TypedDict):
     """The now-playing card's details; empty for non-library files."""
 
@@ -131,6 +188,22 @@ class Media(TypedDict):
     show: str
     season: str
     episode: str
+    # The plot card's: the slogan and the summary, as the library has them,
+    # the ratings (see Ratings) and the credits.
+    tagline: str
+    plot: str
+    ratings: list[Rating]
+    mpaa: str
+    age: str
+    age_level: str
+    userrating: int
+    top250: int
+    awards: list[Award]
+    # And who made it (see Credits).
+    directors: list[str]
+    cast: list[str]
+    cast_more: bool
+    studios: list[str]
 
 
 # --- The title's history ----------------------------------------------------

@@ -45,6 +45,7 @@
         '<div class="badges" id="badges"></div>' +
         '<h1 id="title">—</h1>' +
         '<p class="meta" id="meta"></p>' +
+        '<p class="meta studio" id="studio"></p>' +
         '<p class="file mono hidden" id="file"></p>' +
         /* What the picture is and what the sound is, a row each -- the same
            badges the mobile app draws under its title. */
@@ -92,6 +93,32 @@
         '</div>' +
       '</div>' +
     '</section>' +
+    /* What the title is about, who is in it and what it has been given,
+       under the card of what is playing: the slogan, the plot and, under
+       them, the cast and the ratings, as the library has them. */
+    '<details class="card hidden" id="plotCard">' +
+      '<summary class="panel-toggle"><span id="plotTitle"></span></summary>' +
+      '<div class="plot">' +
+        /* The slogan, the plot and its credits read as one text.  It
+           starts folded -- the plot cut to a few lines, the credits
+           hidden -- and a press on the text lets it all out and takes it
+           back. */
+        '<div class="plotfold" id="plotFold">' +
+          '<p class="tagline hidden" id="tagline"></p>' +
+          '<p class="plottext hidden" id="plotText"></p>' +
+          '<dl class="credits hidden" id="credits"></dl>' +
+        '</div>' +
+        /* The ratings last, past a thin rule, and never folded away:
+           short facts about the film, taken in at a glance.  No heading on
+           the screen -- the houses' marks say what they are -- but one for
+           a screen reader (see strings). */
+        '<div class="ratings hidden" id="ratings" role="list"></div>' +
+        /* What a shield says, over it for a moment after a tap: the house
+           a mark is from, which a mark alone does not always tell.  A
+           screen reader hears each shield's words already. */
+        '<span class="ratingtip hidden" id="ratingTip" aria-hidden="true"></span>' +
+      '</div>' +
+    '</details>' +
     '<details class="card hidden" id="tiles">' +
       '<summary class="panel-toggle"><span id="tilesTitle"></span></summary>' +
       '<div class="tilegrid">' +
@@ -144,8 +171,10 @@
 
   const el = {
     nowCard: $("nowCard"), badges: $("badges"), title: $("title"),
-    meta: $("meta"), file: $("file"),
+    meta: $("meta"), studio: $("studio"), file: $("file"),
     pictureBadges: $("pictureBadges"), soundBadges: $("soundBadges"),
+    plotCard: $("plotCard"), ratings: $("ratings"), ratingTip: $("ratingTip"), tagline: $("tagline"),
+    plotFold: $("plotFold"), plotText: $("plotText"), credits: $("credits"),
     artBox: $("artBox"), poster: $("poster"),
     track: $("track"), bar: $("bar"), tElapsed: $("tElapsed"),
     tFinish: $("tFinish"), tFinishLabel: $("tFinishLabel"),
@@ -169,7 +198,9 @@
   let lastFinish = "";   /* the clock that label belongs in front of         */
   let idleFetched = false;  /* the ended title's events, asked for once      */
   let idleReset = false;    /* the panels have been put away once already    */
+  let plotMedia = {};       /* what the plot card was last drawn from        */
 
+  TinyPPI.bindDisclosure(el.plotCard, pageState + ".plot", true);
   TinyPPI.bindDisclosure(el.tiles, pageState + ".metrics", false);
   /* The chart and the events arrive open: each is what a tab of its own is
      for now (the metadata tab and the history tab), and a tab that opens on a
@@ -193,6 +224,9 @@
     if (media.year) parts.push(media.year);
     if (media.genre) parts.push(media.genre);
     el.meta.textContent = parts.join("  ·  ");
+    /* Who made it, the first studio alone, on a line of its own under what
+       kind of film it is. */
+    el.studio.textContent = (media.studios || [])[0] || "";
 
     if (snapshot.filename) {
       el.file.textContent = snapshot.filename;
@@ -204,6 +238,8 @@
     renderArt(snapshot.art || {});
     renderBadges(snapshot);
     renderFormats(snapshot);
+    /* Which title this is, for the overview to start folded on a new one. */
+    renderPlot(media, [snapshot.title, media.year, media.season, media.episode].join("|"));
 
     const progress = (snapshot.metrics || {}).progress;
     const percent = (progress === null || progress === undefined) ? 0 : progress;
@@ -239,6 +275,317 @@
     el.tFinishLabel.textContent = finish && finishLabel ? finishLabel + " " : "";
     el.tFinishTime.textContent = finish;
     el.tFinish.classList.toggle("hidden", !finish);
+  }
+
+  /* The card is there for the plot, the ratings and the credits: with none
+     of them it is left out.  The slogan belongs to the plot and goes without it -- a slogan on
+     its own says too little to be worth a card -- and with a plot it is left
+     out where the library has none, which is most episodes.  Written only
+     when the words change: they stand still for the whole title, and a plot
+     is the longest text on the page. */
+  let plotTitle = null;
+  function renderPlot(media, title) {
+    /* A frame that moved nothing of the title carries the very object the
+       last one did (see merge in core.js): there is nothing to draw again. */
+    if (media === plotMedia && title === plotTitle) return;
+    plotMedia = media;
+    const plot = (media.plot || "").trim();
+    const tagline = plot ? (media.tagline || "").trim() : "";
+    const fresh = el.plotText.textContent !== plot || title !== plotTitle;
+    plotTitle = title;
+    for (const [node, text] of [[el.tagline, tagline], [el.plotText, plot]]) {
+      if (node.textContent !== text) node.textContent = text;
+      node.classList.toggle("hidden", !text);
+    }
+    const badges = ratingBadges(media, TinyPPI.T);
+    fillRatings(badges);
+    el.ratings.setAttribute("aria-label", TinyPPI.T.ratings);
+    const credits = creditList(media, TinyPPI.T);
+    fillCredits(credits);
+    el.plotCard.classList.toggle("hidden", !plot && !badges.length && !credits.length);
+    /* A new title, or a new plot, starts folded again, and is measured once
+       it is laid out; credits that arrive later fold under it as they
+       come. */
+    if (fresh) {
+      openPlot(false);
+      measurePlot();
+    } else {
+      foldPlot();
+    }
+  }
+
+  /* A plot is folded to a few lines (see .plot .plottext), its credits
+     hidden under it, and a press on the text -- a click, a tap, or Enter
+     or Space once it has the focus -- lets all of it out and takes it
+     back.  It folds wherever there is more than those lines to show: a
+     plot that runs past them, or credits under it.  How
+     many lines a plot takes is a matter of how wide it is laid out, so it
+     is measured when the plot changes, when the card is opened and once a
+     burst of resizes has settled (with the charts, below).  Pressable, it is a button to a screen reader, and
+     says under a pointer what a press does. */
+  let plotCut = false;
+
+  function openPlot(open) {
+    el.plotFold.classList.toggle("open", open);
+    if (el.plotFold.classList.contains("fold")) {
+      el.plotFold.setAttribute("aria-expanded", String(open));
+      el.plotFold.title = open ? TinyPPI.T.plot_less : TinyPPI.T.plot_more;
+    }
+  }
+
+  function measurePlot() {
+    if (!el.plotFold.classList.contains("open")) {
+      plotCut = el.plotText.scrollHeight > el.plotText.clientHeight + 1;
+    }
+    foldPlot();
+  }
+
+  function foldPlot() {
+    const shown = (node) => !node.classList.contains("hidden");
+    const more = shown(el.plotText) && (plotCut || shown(el.credits));
+    el.plotFold.classList.toggle("fold", more);
+    if (more) {
+      el.plotFold.setAttribute("role", "button");
+      el.plotFold.tabIndex = 0;
+    } else {
+      el.plotFold.classList.remove("open");
+      for (const name of ["role", "tabindex", "aria-expanded", "title"]) el.plotFold.removeAttribute(name);
+    }
+    openPlot(el.plotFold.classList.contains("open"));
+  }
+
+  function flipPlot() {
+    if (el.plotFold.classList.contains("fold")) openPlot(!el.plotFold.classList.contains("open"));
+  }
+
+  el.plotFold.addEventListener("click", flipPlot);
+  el.plotFold.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    flipPlot();
+  });
+  el.plotCard.addEventListener("toggle", measurePlot);
+
+  /* Names as a line: a comma between two, and an ellipsis after the last
+     where the add-on cut the list (the cast, past its first twenty). */
+  function nameList(names, more) {
+    return names.join(", ") + (more ? ", …" : "");
+  }
+
+  /* Who directed the title and who is in it, as the add-on sends them --
+     every director, the cast's first twenty: the overview's credits, the
+     director over the cast.  What kind of film
+     it is and who made it stand in the card above. */
+  function creditList(media, T) {
+    const directors = media.directors || [];
+    const cast = media.cast || [];
+    const credits = [];
+    if (directors.length) credits.push({ label: T.director, names: nameList(directors, false) });
+    if (cast.length) credits.push({ label: T.cast, names: nameList(cast, Boolean(media.cast_more)) });
+    return credits;
+  }
+
+  /* What it is over the names, as a description list, so a screen reader
+     says which names are whose.  Built again only when one would say
+     something else. */
+  function fillCredits(credits) {
+    const signature = JSON.stringify(credits);
+    if (el.credits.dataset.signature === signature) return;
+    el.credits.dataset.signature = signature;
+    el.credits.replaceChildren();
+    for (const credit of credits) {
+      const line = document.createElement("div");
+      line.className = "credit";
+      const label = document.createElement("dt");
+      label.textContent = credit.label;
+      const names = document.createElement("dd");
+      names.textContent = credit.names;
+      line.append(label, names);
+      el.credits.append(line);
+    }
+    el.credits.classList.toggle("hidden", !credits.length);
+  }
+
+  /* What a rating's mark is drawn from, and what a screen reader calls the
+     house it is from: brand names, the same in every language.  The marks
+     are the add-on's own drawings in each house's colours (see
+     tools/gen_rating_marks.py); a source none of these names -- an NFO may
+     carry any -- wears a plain circle with its first letter instead. */
+  const RATING_SOURCES = {
+    imdb: "IMDb", tmdb: "TMDb", trakt: "Trakt", tvdb: "TVDB", letterboxd: "Letterboxd",
+    metacritic: "Metacritic", metacriticuser: "Metacritic User Score",
+    rottentomatoes: "Rotten Tomatoes", popcorn: "Rotten Tomatoes Popcornmeter",
+    rogerebert: "Roger Ebert", myanimelist: "MyAnimeList", mdblist: "MDBList"
+  };
+  /* What Rotten Tomatoes calls a rating it certified: its critics' and its
+     audience's.  A certified one wears a seal on its mark's corner. */
+  const CERTIFICATES = { rottentomatoes: "Certified Fresh", popcorn: "Verified Hot" };
+  /* The big awards, as the add-on names them (see web/awards.py) and as
+     they are called, untranslated. */
+  const AWARDS = { oscar: "Oscar", globe: "Golden Globe", bafta: "BAFTA", emmy: "Emmy" };
+
+  /* Every rating the library holds for the title (see web/ratings.py), in
+     the order the badges stand: the age rating first -- who the film is for
+     is asked before how good it is -- then a score for each source, the
+     reader's own, the place in the IMDb Top 250 and the big awards.
+     Each badge says in words what its mark shows, for a screen reader and
+     under a pointer. */
+  /* The board an age rating's mark is from, by its name ("fsk12" is the
+     FSK's). */
+  function boardOf(age) {
+    if (age.startsWith("fsk")) return "FSK";
+    if (age.startsWith("mpa_")) return "MPA";
+    if (age.startsWith("tv_")) return "TV Parental Guidelines";
+    return "BBFC";
+  }
+
+  function ratingBadges(media, T) {
+    const badges = [];
+    if (media.mpaa) {
+      /* One the add-on could read for its board and level -- FSK, MPA, TV
+         Parental Guidelines, BBFC -- is a shield like the others: the board
+         on the level's colour, the level beside it ("FSK" | "12").  Any other
+         is written as the scraper wrote it. */
+      badges.push(media.age
+        ? { kind: "age", mark: media.age, value: media.age_level || "", said: media.mpaa,
+            named: boardOf(media.age) }
+        : { kind: "age", value: media.mpaa, said: media.mpaa, named: media.mpaa });
+    }
+    for (const entry of media.ratings || []) {
+      const source = entry.source || "";
+      const name = RATING_SOURCES[source] ||
+        source.charAt(0).toUpperCase() + source.slice(1);
+      const value = entry.rating.toFixed(1);
+      const certificate = (entry.certified && CERTIFICATES[source]) || "";
+      const named = certificate ? name + " · " + certificate : name;
+      badges.push({
+        kind: "score",
+        mark: RATING_SOURCES[source] ? source : "",
+        letter: name.charAt(0),
+        certified: Boolean(certificate),
+        value, said: (named + " " + value).trim(), named
+      });
+    }
+    if (media.userrating) {
+      const value = String(media.userrating);
+      badges.push({ kind: "mine", value, said: T.my_rating + " " + value, named: T.my_rating });
+    }
+    if (media.top250) {
+      badges.push({ kind: "rank", mark: "top250", value: "#" + media.top250,
+                    said: T.top250.replace("%s", media.top250), named: "IMDb Top 250" });
+    }
+    for (const award of media.awards || []) badges.push(awardBadge(award, T));
+    return badges;
+  }
+
+  /* An award wears a drawing of what it hands out on its own ground, and
+     beside it how many it won -- or, where it won none, how many it was
+     nominated for, on a quieter shield (see .rating.nominee).  Under a
+     pointer, what it won it for. */
+  function awardBadge(award, T) {
+    const name = AWARDS[award.award] || award.award;
+    const won = award.won.length;
+    const more = award.nominated ? T.award_nominated.replace("%s", award.nominated) : "";
+    const value = String(won || award.nominated);
+    const said = name + " " + (won ? T.award_won.replace("%s", won) : more);
+    const named = won ? [name + ": " + award.won.join(", "), more].filter(Boolean).join(" · ")
+      : name + " · " + more;
+    return { kind: won ? "award" : "nominee", mark: "award_" + award.award, value, said, named };
+  }
+
+  /* The left of a shield: the drawing for its source on a ground of the
+     house's own colour (see .rating .side in live-panels.css), the reader's
+     heart on the accent, a letter for a source there is no drawing of -- or
+     nothing, for an age rating that is no FSK one and is written out. */
+  function ratingSide(badge) {
+    const side = document.createElement("span");
+    if (badge.mark) {
+      /* An age rating's plate is the whole of the left, edge to edge. */
+      side.className = "side " + badge.mark + (badge.kind === "age" ? " plate" : "");
+      const image = document.createElement("img");
+      /* As wide as it is drawn: the SVG says, and the CSS gives only the
+         height (see .rating .mark). */
+      image.className = "mark";
+      image.src = "/ratings/" + badge.mark + ".svg";
+      image.alt = "";
+      side.append(image);
+      if (badge.certified) {
+        const seal = document.createElement("img");
+        seal.className = "seal";
+        seal.src = "/ratings/certified.svg";
+        seal.alt = "";
+        side.append(seal);
+      }
+      return side;
+    }
+    if (badge.kind === "age") return null;
+    side.className = "side " + (badge.kind === "mine" ? "heart" : "letter");
+    side.textContent = badge.letter || "";
+    return side;
+  }
+
+  /* Built again only when a badge would say something else, which is once a
+     title (see fillRow).  Each is a shield: the house on the left, what it
+     gave on the right.  What a reader is told is the badge's sentence, kept
+     off the screen; what is drawn is kept from the reader, who would
+     otherwise hear "8.5 612,345" with nothing to say what either is. */
+  /* A tap -- or a click -- on a shield shows over it for a moment whose it
+     is; under a pointer its tooltip says so too. */
+  let tipTimer = 0;
+  /* The tip is placed in the card's body it stands in (.plot is its
+     positioned box), wherever the shields sit inside it. */
+  function tellRating(node) {
+    const card = el.ratingTip.parentElement.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
+    el.ratingTip.textContent = node.title;
+    el.ratingTip.style.left = (box.left + box.width / 2 - card.left) + "px";
+    el.ratingTip.style.top = (box.top - card.top) + "px";
+    el.ratingTip.classList.remove("hidden");
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => el.ratingTip.classList.add("hidden"), 2000);
+  }
+
+  /* A tap on a shield is the shield's, not one that folds the plot. */
+  el.ratings.addEventListener("click", (event) => {
+    const node = event.target.closest(".rating");
+    if (!node) return;
+    event.stopPropagation();
+    tellRating(node);
+  });
+
+  function fillRatings(badges) {
+    const signature = JSON.stringify(badges);
+    if (el.ratings.dataset.signature === signature) return;
+    el.ratings.dataset.signature = signature;
+    el.ratings.replaceChildren();
+    for (const badge of badges) {
+      const node = document.createElement("span");
+      node.className = "rating " + badge.kind;
+      node.setAttribute("role", "listitem");
+      /* Under a pointer, as after a tap, whose it is: what it gave stands
+         on the shield already. */
+      node.title = badge.named;
+      const said = document.createElement("span");
+      said.className = "said";
+      said.textContent = badge.said;
+      const look = document.createElement("span");
+      look.className = "look";
+      look.setAttribute("aria-hidden", "true");
+      const side = ratingSide(badge);
+      if (side) look.append(side);
+      if (badge.value) {
+        const figures = document.createElement("span");
+        figures.className = "figures";
+        const value = document.createElement("span");
+        value.className = "value";
+        value.textContent = badge.value;
+        figures.append(value);
+        look.append(figures);
+      }
+      node.append(said, look);
+      el.ratings.append(node);
+    }
+    el.ratings.classList.toggle("hidden", !badges.length);
   }
 
   /* The poster is fetched once per film: the add-on sends a tag that changes
@@ -714,6 +1061,7 @@
     resizeTimer = setTimeout(() => {
       drawCharts();
       chapters.relayout();
+      measurePlot();
     }, 120);
   });
 
@@ -724,6 +1072,13 @@
     /* The bar may already be drawn by the time the words for it arrive; the
        reading is there either way, and this puts the label in front of it. */
     renderFinish(lastFinish);
+    $("plotTitle").textContent = T.plot;
+    openPlot(el.plotFold.classList.contains("open"));
+    /* The badges carry words of the table too ("My rating"), and the
+       credits their name. */
+    fillRatings(ratingBadges(plotMedia, T));
+    el.ratings.setAttribute("aria-label", T.ratings);
+    fillCredits(creditList(plotMedia, T));
     $("tilesTitle").textContent = T.metrics;
     $("kSwitches").textContent = T.switches;
     $("kWarnings").textContent = T.warnings;
@@ -767,7 +1122,7 @@
          page is a wall of several hundred posters. */
       if (!idleReset) {
         idleReset = true;
-        const cards = [el.nowCard, el.tiles, el.chartCard];
+        const cards = [el.nowCard, el.plotCard, el.tiles, el.chartCard];
         for (const node of cards) node.classList.add("hidden");
         live = [];
         posterTag = "";

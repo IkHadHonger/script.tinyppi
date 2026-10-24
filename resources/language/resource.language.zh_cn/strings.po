@@ -1004,16 +1004,16 @@ msgid "In / drop / out"
 msgstr "输入 / 丢帧 / 输出"
 
 msgctxt "#32249"
-msgid "Processor"
-msgstr "处理器"
+msgid "CPU cores"
+msgstr "CPU 核心"
 
 msgctxt "#32250"
 msgid "Temperature"
 msgstr "温度"
 
 msgctxt "#32251"
-msgid "Memory usage"
-msgstr "内存使用"
+msgid "CPU / RAM"
+msgstr "CPU / 内存"
 
 msgctxt "#32252"
 msgid "Player cache"
@@ -1502,3 +1502,59 @@ msgstr "进度条"
 msgctxt "#32369"
 msgid "Show chapter markers"
 msgstr "显示章节标记"
+
+msgctxt "#32370"
+msgid "Overview"
+msgstr "概览"
+
+msgctxt "#32372"
+msgid "My rating"
+msgstr "我的评分"
+
+msgctxt "#32373"
+msgid "Top 250 · #%s"
+msgstr "Top 250 · 第 %s 名"
+
+msgctxt "#32378"
+msgid "Cast"
+msgstr "演员"
+
+msgctxt "#32381"
+msgid "Show more"
+msgstr "显示更多"
+
+msgctxt "#32382"
+msgid "Show less"
+msgstr "收起"
+
+msgctxt "#32383"
+msgid "Ratings"
+msgstr "评分"
+
+msgctxt "#32384"
+msgid "MDBList API key"
+msgstr "MDBList API 密钥"
+
+msgctxt "#32385"
+msgid "With a free key from mdblist.com (Preferences → API), the overview card shows the ratings MDBList gathers for a film: IMDb, TMDb, Trakt, Letterboxd, Rotten Tomatoes, Metacritic and more. To ask, the film's IMDb or TMDb id is sent to MDBList. Left empty, the card shows the ratings Kodi's library holds."
+msgstr "填入 mdblist.com 的免费密钥（Preferences → API）后，概览卡片会为影片显示 MDBList 汇总的评分：IMDb、TMDb、Trakt、Letterboxd、Rotten Tomatoes、Metacritic 等。为此会把影片的 IMDb 或 TMDb 编号发送给 MDBList。留空时，卡片显示 Kodi 媒体库中的评分。"
+
+msgctxt "#32386"
+msgid "Director"
+msgstr "导演"
+
+msgctxt "#32387"
+msgid "WhatsOn API key (optional)"
+msgstr "WhatsOn API 密钥（可选）"
+
+msgctxt "#32388"
+msgid "For every film, the overview card asks WhatsOn (whatson-api.onrender.com, free for non-commercial use) whether Rotten Tomatoes certified it: a seal on the Tomatometer for Certified Fresh, on the Popcornmeter for Verified Hot. Where neither MDBList nor the library has one of the two ratings, WhatsOn's is shown. Without a key WhatsOn answers 40 times an hour and 200 times a day; with a free key from its author (pierrevano.github.io), 200 times an hour and 1,000 a day. To ask, the film's IMDb or TMDb id is sent to WhatsOn, once per film."
+msgstr "概览卡片会为每部影片向 WhatsOn（whatson-api.onrender.com，非商业用途免费）查询 Rotten Tomatoes 是否给予认证：新鲜度（Tomatometer）上的印章表示 Certified Fresh，爆米花指数（Popcornmeter）上的印章表示 Verified Hot。若 MDBList 和媒体库都缺少其中某项评分，则显示 WhatsOn 的评分。无密钥时 WhatsOn 每小时应答 40 次、每天 200 次；使用作者提供的免费密钥（pierrevano.github.io）时每小时 200 次、每天 1000 次。为此会把影片的 IMDb 或 TMDb 编号发送给 WhatsOn，每部影片一次。"
+
+msgctxt "#32389"
+msgid "%s won"
+msgstr "获得 %s 项"
+
+msgctxt "#32390"
+msgid "%s nominated"
+msgstr "%s 项提名"

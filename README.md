@@ -68,11 +68,11 @@ Existing Kodi posters and fanart are preserved; fanart.tv lookup is not added.
 
 ## Screenshots
 <p align="center">
-<img width="1200" alt="No Convert" src="https://github.com/user-attachments/assets/b083e2b2-bff2-40de-bdc4-361688e4df5c" />
+<img width="1200" alt="No Convert" src="https://github.com/user-attachments/assets/ddba5b90-11e4-4439-9f87-4c37cc2f89ac" />
 </p>
 
 <p align="center">
-<img width="1200" alt="Convert" src="https://github.com/user-attachments/assets/0260625f-7d2e-4bf8-b07c-10547dfc0956" />
+<img width="1200" alt="Convert" src="https://github.com/user-attachments/assets/3e1f43ad-535c-407d-9e7c-51b6fe12694a" />
 </p>
 
 <p align="center">
@@ -418,9 +418,15 @@ with the access token, which is what you need standing in front of the TV with
 a phone in your hand. It is meant for a home network: **do not forward its port
 to the internet**.
 
+A free [MDBList](https://mdblist.com) API key under **Settings → Dashboard →
+Ratings** has the overview card show what IMDb, TMDb, Trakt, Letterboxd, Rotten
+Tomatoes, Metacritic and more gave a film, rather than only the ratings Kodi's
+scraper wrote, which stay the fallback.
+
 Everything about it — the tabs, the themes, the library, the remote, what it
 costs the box and how it is secured — is described in
-**[docs/web-dashboard.md](docs/web-dashboard.md)**.
+the wiki's **[Web Dashboard](wiki/Web-Dashboard.md)** and
+**[Dashboard Security](wiki/Dashboard-Security.md)** pages.
 
 ---
 

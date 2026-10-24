@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="script.tinyppi" name="TinyPPI" version="2.16.4" provider-name="jamal2362, IkHadHonger">
+<addon id="script.tinyppi" name="TinyPPI" version="2.19.1" provider-name="jamal2362, IkHadHonger">
     <requires>
-        <import addon="xbmc.python" version="3.0.0"/>
-        <import addon="script.module.sidedata" version="1.6.0"/>
+        <import addon="xbmc.python" version="3.0.0" />
+        <import addon="script.module.sidedata" version="1.6.0" />
     </requires>
     <extension point="xbmc.service" library="resources/lib/service/start.py" />
     <extension point="xbmc.python.script" library="main.py">
@@ -22,7 +22,7 @@
         <description lang="en">Opens a separate process information window. This window displays codec, video, and audio details for the currently playing media.</description>
         <description lang="hu">Megnyit egy külön folyamatinformációs ablakot. Ez az ablak az aktuálisan lejátszott média kodek-, videó- és hangadatait jeleníti meg.</description>
         <description lang="zh">打开一个独立的进程信息窗口。此窗口显示当前播放媒体的编解码器、视频和音频详细信息。</description>
-        <!-- The latest version only: replace this entry on every version bump. -->
+
         <news>v2.16.4 (Jellyfin fork)
 - Keep playback, track and VS10 controls when viewing a box through the main Cube.
 - Commands use only the selected remote box's saved token and never run locally.
