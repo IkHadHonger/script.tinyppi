@@ -181,6 +181,7 @@ test("a pointer drags the bar, and the box hears once, where it let go", async (
     request.method() === "POST" && request.url().endsWith("/api/command"));
   await touch("touchEnd");
   const command = JSON.parse((await asked).postData());
+  if (!cdp) await handset.mouse.move(0, 0);
   assert.equal(command.action, "seek_percent");
   assert.ok(Math.abs(command.value - 60) < 0.5, `seeks to ${command.value}`);
   await handset.waitForFunction(() => document.querySelectorAll(".chapter-dot").length === 2);
