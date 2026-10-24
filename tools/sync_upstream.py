@@ -62,9 +62,18 @@ def main():
     current = ET.fromstring(ours).attrib
     result = git("merge", "--no-commit", "--no-ff", upstream, check=False)
     conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
-    supported = {"addon.xml", "resources/lib/info/properties.py"}
+    supported = {
+        "addon.xml",
+        "docs/web-dashboard.md",
+        "resources/lib/info/properties.py",
+    }
     if result.returncode and not set(conflicts).issubset(supported):
         raise RuntimeError("Manual merge needed: " + result.stderr + ", ".join(conflicts))
+    if "docs/web-dashboard.md" in conflicts:
+        # Upstream replaced its redirect page with wiki/, but this fork's page
+        # contains Jellyfin, multi-box and relay documentation of its own.
+        git("checkout", "--ours", "--", "docs/web-dashboard.md")
+        git("add", "docs/web-dashboard.md")
     if "resources/lib/info/properties.py" in conflicts:
         path = Path("resources/lib/info/properties.py")
         upstream_properties = git("show", f"{upstream}:{path}").stdout
