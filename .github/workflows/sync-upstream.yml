@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/sync-upstream.yml', 'tools/sync_upstream.py']
+    paths: ['.github/workflows/sync-upstream.yml', 'tools/sync_upstream.py', 'tests/browser/dashboard.test.mjs']
 permissions:
   contents: write
 concurrency:
