@@ -1,4 +1,8 @@
-"""Merge upstream without discarding the Jellyfin fork; stop on real conflicts."""
+"""Merge upstream without discarding the Jellyfin fork.
+
+Only reviewed metadata, generated-data and compatibility conflicts are resolved
+automatically; every unknown code or automation conflict still stops the run.
+"""
 
 import re
 import subprocess
