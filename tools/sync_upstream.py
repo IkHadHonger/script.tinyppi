@@ -92,6 +92,13 @@ def main():
             if merged.returncode:
                 raise RuntimeError("Addon metadata conflict needs manual review")
             Path("addon.xml").write_text(merged.stdout, encoding="utf-8")
+    wiki_workflow = Path(".github/workflows/wiki.yml")
+    if wiki_workflow.exists():
+        # The Actions token may update content but not introduce workflow files
+        # without a separate workflows permission. The fork does not publish
+        # its wiki from this add-on branch, so keep the reviewed wiki pages but
+        # leave that upstream-only publisher out of the merge.
+        git("rm", "-f", str(wiki_workflow))
     awards = Path("resources/data/awards.json")
     if awards.exists():
         # Upstream's generated single-line dataset may carry whitespace after
