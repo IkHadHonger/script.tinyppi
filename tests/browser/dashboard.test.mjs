@@ -124,8 +124,9 @@ test("the chapters ahead sit on the bar, a mouse brings up the rest, a click jum
 
 test("a pointer drags the bar, and the box hears once, where it let go", async (t) => {
   // A phone of its own: touch, and a narrow screen.
+  const nativeTouch = process.env.BROWSER !== "webkit";
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 },
-                                           hasTouch: true, isMobile: true });
+                                           hasTouch: nativeTouch, isMobile: nativeTouch });
   t.after(() => phone.close());
   await phone.addInitScript((token) => localStorage.setItem("tinyppi.token", token), TOKEN);
   const handset = await phone.newPage();
