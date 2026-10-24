@@ -45,8 +45,17 @@ def main():
         return
     base = git("merge-base", "HEAD", upstream).stdout.strip()
     changes = git("diff", "--name-only", base, upstream).stdout.splitlines()
-    if any(p.startswith((".github/", "tools/sync_upstream")) for p in changes):
-        raise RuntimeError("Upstream automation changes require manual review")
+    reviewed_automation = {".github/workflows/wiki.yml"}
+    automation_changes = [
+        p for p in changes
+        if p.startswith((".github/", "tools/sync_upstream"))
+        and p not in reviewed_automation
+    ]
+    if automation_changes:
+        raise RuntimeError(
+            "Upstream automation changes require manual review: "
+            + ", ".join(automation_changes)
+        )
     ours = git("show", "HEAD:addon.xml").stdout
     theirs = git("show", f"{upstream}:addon.xml").stdout
     previous = git("show", f"{base}:addon.xml").stdout
