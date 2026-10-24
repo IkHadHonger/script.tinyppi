@@ -104,7 +104,8 @@ def main():
     text = ET.tostring(root, encoding="unicode")
     if not text.startswith("<?xml"):
         text = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + text
-    Path("addon.xml").write_text(text + ("\n" if not text.endswith("\n") else ""), encoding="utf-8")
+    text = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
+    Path("addon.xml").write_text(text, encoding="utf-8")
     bridge = Path("resources/lib/web/jellyfin.py")
     bridge.write_text(
         re.sub(r'Version="[\d.]+"', f'Version="{new}"', bridge.read_text(encoding="utf-8")),
