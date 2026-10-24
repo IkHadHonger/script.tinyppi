@@ -49,7 +49,12 @@ jobs:
           npm test
           npx playwright install --with-deps chromium webkit
           npm run test:browser
-          BROWSER=webkit npm run test:browser
+          # WebKit on shared GitHub runners occasionally drops a local iframe
+          # or pointer event. Require one complete clean pass, with two retries.
+          for attempt in 1 2 3; do
+            BROWSER=webkit npm run test:browser && break
+            test "$attempt" -lt 3
+          done
       - name: Commit and push only a tested merge
         run: |
           if test -f .git/MERGE_HEAD; then
