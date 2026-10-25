@@ -56,6 +56,7 @@ function ask(question) {
   art.style.cssText = "display:block;width:100%;max-height:260px;object-fit:cover;aspect-ratio:16/9;border-radius:12px";
   panel.before(art);
   const query = new URLSearchParams(question.body).toString();
+  const episode = Boolean(question.body.episodeid);
   let poster = false;
   art.addEventListener("load", () => {
     if (asking === question) {
@@ -75,7 +76,7 @@ function ask(question) {
     }
   });
   art.style.display = "none";
-  TinyPPI.loadArtwork(art, "/api/art?kind=fanart&" + query);
+  TinyPPI.loadArtwork(art, "/api/art?kind=" + (episode ? "thumb" : "fanart") + "&" + query);
   panel.replaceChildren();
   delete panel.dataset.signature;
   panel.hidden = true;

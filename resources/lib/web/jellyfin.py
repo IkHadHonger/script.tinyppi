@@ -163,7 +163,7 @@ class JellyfinBridge:
         # alongside a separate token header (some servers prioritize the former).
         authorization = (
             'MediaBrowser Client="TinyPPI", Device="CoreELEC", '
-            'DeviceId="tinyppi-dashboard", Version="2.19.5", Token="{}"'
+            'DeviceId="tinyppi-dashboard", Version="2.19.6", Token="{}"'
         ).format(quote(connection["token"], safe=""))
         request = Request(
             connection["address"] + path,
