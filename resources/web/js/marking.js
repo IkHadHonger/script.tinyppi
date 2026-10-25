@@ -47,6 +47,35 @@ function ask(question) {
     panel.setAttribute("aria-label", T.plot);
     el.markTitle.after(panel);
   }
+  const previousArt = document.getElementById("libraryArtwork");
+  if (previousArt) previousArt.remove();
+  const art = document.createElement("img");
+  art.id = "libraryArtwork";
+  art.alt = "";
+  art.hidden = true;
+  art.style.cssText = "display:block;width:100%;max-height:260px;object-fit:cover;aspect-ratio:16/9;border-radius:12px";
+  panel.before(art);
+  const query = new URLSearchParams(question.body).toString();
+  let poster = false;
+  art.addEventListener("load", () => {
+    if (asking === question) {
+      art.hidden = false;
+      art.style.display = "block";
+    }
+  });
+  art.addEventListener("error", () => {
+    if (asking !== question) return;
+    if (!poster) {
+      poster = true;
+      art.style.objectFit = "contain";
+      TinyPPI.loadArtwork(art, "/api/art?kind=poster&" + query);
+    } else {
+      art.hidden = true;
+      art.style.display = "none";
+    }
+  });
+  art.style.display = "none";
+  TinyPPI.loadArtwork(art, "/api/art?kind=fanart&" + query);
   panel.replaceChildren();
   delete panel.dataset.signature;
   panel.hidden = true;
