@@ -507,3 +507,12 @@ The main dashboard shows active configured TinyPPI/CoreELEC boxes. Apple TV
 and Infuse session cards were removed in 2.15.3; the page no longer starts the
 separate Infuse session poller. Jellyfin account integration, artwork, trusted
 boxes and the shared-state initialization of the library tabs are unchanged.
+
+### Library selection overview
+
+Selecting a film, series or episode shows its Overview above the existing play,
+resume and watched controls. It reads the selected library title without starting
+playback and includes its plot, tagline, rating shields, age classification and
+credits where available. The existing MDBList and WhatsOn keys also apply here;
+no additional key is needed. Kodi's own metadata remains available without them.
+The poster listings stay small: full details are requested only on selection.

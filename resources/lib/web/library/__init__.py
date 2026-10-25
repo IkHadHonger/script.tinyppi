@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from web.library import cache, common, films, marks, progress, series
 from web.library.cache import changed, invalidate, new_cache, revision, settle
+from web.library.details import overview
 from web.library.films import art_path, catalogue, movies, play
 from web.library.marks import clear_resume, set_watched
 from web.library.progress import continuing
@@ -40,7 +41,7 @@ from web.library.series import (
 __all__ = [
     "art_path", "catalogue", "changed", "clear_resume", "continuing",
     "episode_art_path", "episodes", "invalidate", "movies", "new_cache",
-    "play", "play_episode", "revision", "set_watched", "settle",
+    "overview", "play", "play_episode", "revision", "set_watched", "settle",
     "show_art_path", "shows",
     "cache", "common", "films", "marks", "progress", "series",
 ]

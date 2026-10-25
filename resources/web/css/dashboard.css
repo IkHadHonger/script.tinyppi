@@ -772,3 +772,15 @@
 #markTitle {
   overflow-wrap: anywhere;
 }
+
+/* The chosen library title's overview, above its existing playback actions. */
+#markDialog:has(.library-overview:not([hidden])) { width: min(600px, calc(100vw - 32px)); }
+#markDialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.library-overview { display: grid; gap: 12px; text-align: left; }
+.library-overview[hidden] { display: none; }
+.library-overview .plottext { white-space: pre-line; color: var(--text); line-height: 1.6; }
+.library-overview .tagline { font-weight: 600; color: var(--text); }
+.library-overview .ratings { margin: 0; }
+.library-overview .credits { margin: 0; }
+
+.library-overview h4 { margin: 0; font-size: 14px; }

@@ -260,3 +260,9 @@ def playing_ratings() -> Ratings | None:
     if item_id and kind == "episode":
         return _episode_ratings(item_id)
     return no_ratings()
+
+
+def details_ratings(details: Json, kind: str, parent: Json) -> Ratings:
+    """Use the same rating and award rules for a selected library title."""
+    return _collect(details, parent, "movie" if kind == "movie" else "tv",
+                    film_ids(details) if kind == "movie" else None)

@@ -26,6 +26,7 @@
    holds the moment it has written, and the walls, the row and the open show
    are read again, so what they show is what the library now says. */
 
+let overviewTimer = null;
 let asking = null;         /* what the open question is about              */
 
 function ask(question) {
@@ -39,9 +40,22 @@ function ask(question) {
   el.markClear.hidden = !question.resumable;
   el.markDialog.returnValue = "";
   el.markDialog.showModal();
+  let panel = document.getElementById("libraryOverview");
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "libraryOverview";
+    panel.setAttribute("aria-label", T.plot);
+    el.markTitle.after(panel);
+  }
+  panel.replaceChildren();
+  delete panel.dataset.signature;
+  panel.hidden = true;
+  loadOverview(question, panel);
+
 }
 
 el.markDialog.addEventListener("close", () => {
+  clearTimeout(overviewTimer);
   const answer = el.markDialog.returnValue;
   const question = asking;
   asking = null;
@@ -53,6 +67,19 @@ el.markDialog.addEventListener("close", () => {
     setWatched(question.body, answer === "watched");
   }
 });
+
+/* Read the selected title, never the playing one. Late replies may not
+   replace a newer selection, and unavailable details leave controls usable. */
+async function loadOverview(question, panel, refresh = 0) {
+  try {
+    const query = new URLSearchParams(question.body).toString();
+    const media = await TinyPPI.getJSON("/api/overview?" + query);
+    if (asking !== question || !el.markDialog.open) return;
+    TinyPPI.panels.overview(panel, media);
+    // Existing rating providers fill their caches in the background.
+    if (refresh < 2) overviewTimer = setTimeout(() => loadOverview(question, panel, refresh + 1), 2500);
+  } catch (_) { /* Details must not prevent playing or marking a title. */ }
+}
 
 /* Forget where a film or an episode got to, leaving it seen or unseen as it
    was: it leaves the row of things half-watched, and its bar leaves the wall. */

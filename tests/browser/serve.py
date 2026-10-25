@@ -38,6 +38,19 @@ FILMS = [
 
 def fake_rpc(method: str, params: dict | None = None) -> dict:
     params = params or {}
+    detail_kinds = {
+        "VideoLibrary.GetMovieDetails": ("movieid", "moviedetails"),
+        "VideoLibrary.GetTVShowDetails": ("tvshowid", "tvshowdetails"),
+        "VideoLibrary.GetEpisodeDetails": ("episodeid", "episodedetails"),
+    }
+    if method in detail_kinds:
+        id_key, result_key = detail_kinds[method]
+        return {"result": {result_key: {
+            id_key: params[id_key], "title": "Selected library title",
+            "plot": "The selected library story", "tagline": "A library slogan",
+            "ratings": {"imdb": {"rating": 8.4}}, "mpaa": "FSK 12",
+            "director": ["Selected Director"], "cast": [{"name": "Selected Actor"}],
+        }}}
     if method == "VideoLibrary.GetMovies":
         if "filter" in params:
             return {"result": {"movies": [

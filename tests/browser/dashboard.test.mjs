@@ -320,6 +320,8 @@ test("films: the wall, search and clearing it", async () => {
 test("a press on a film asks, and marking it sends the id", async () => {
   await page.locator("#filmGrid .film").nth(4).click();
   await page.waitForSelector("#markDialog[open]");
+  await page.locator("#libraryOverview").filter({ hasText: "The selected library story" }).waitFor();
+  assert.ok(await page.locator("#libraryOverview .rating").count() >= 1);
   // Listened for before the press: the wall may be read again (the library
   // moved) before the click itself has returned.
   const [request] = await Promise.all([
@@ -347,11 +349,15 @@ test("series: a show opens with its seasons and episodes", async () => {
   await page.waitForFunction(() => document.querySelectorAll("#seriesGrid .film").length === 5);
   await page.locator("#seriesGrid .film").nth(1).click();
   await page.waitForSelector("#markDialog[open]");
+  await page.locator("#libraryOverview").filter({ hasText: "The selected library story" }).waitFor();
   await page.click("#markPlay");
   await page.waitForSelector(".seasonfold");
   assert.equal(await page.locator(".seasonfold").count(), 2);
   await page.locator(".seasonfold .season").first().click();
   await page.waitForFunction(() => document.querySelector(".seasonepisodes")?.children.length > 0);
+  await page.locator(".episode").first().click();
+  await page.locator("#libraryOverview").filter({ hasText: "The selected library story" }).waitFor();
+  await page.click("#markCancel");
   await page.click("#seriesBack");
   await page.waitForFunction(() => document.querySelectorAll(".seasonfold").length === 0);
 });

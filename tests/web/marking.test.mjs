@@ -314,3 +314,39 @@ test("before /api/hello has given any words, the question and its failure are in
   tile(view, "Show 2").click();
   assert.equal(asked(view).play, "Open");
 });
+
+test("selection overview shows story, credits and rating shields without playback", async (t) => {
+  const view = await open(t, { routes: { "/api/overview": [200, {
+    plot: "Selected story <script>unsafe()</script>", tagline: "Slogan", mpaa: "FSK 12",
+    age: "fsk12", age_level: "12", ratings: [{ source: "imdb", rating: 8.4 }],
+    directors: ["Director"], cast: ["Actor"], awards: []
+  }] } });
+  tile(view, "Film 01").click();
+  await settle();
+  const panel = view.$("libraryOverview");
+  assert.equal(panel.hidden, false);
+  assert.match(panel.textContent, /Selected story/);
+  assert.match(panel.textContent, /Director/);
+  assert.match(panel.textContent, /8.4/);
+  assert.equal(panel.querySelectorAll(".rating").length, 2);
+  assert.equal(panel.querySelector("script"), null);
+  assert.equal(posts(view).length, 0);
+  assert.ok(view.requests.some(request => request.url === "/api/overview?movieid=1"));
+  answer(view, "cancel");
+});
+
+test("an old overview reply cannot overwrite a newer selection", async (t) => {
+  const view = await open(t);
+  const pending = [];
+  view.window.TinyPPI.getJSON = () => new Promise(resolve => pending.push(resolve));
+  tile(view, "Film 01").click();
+  answer(view, "cancel");
+  tile(view, "Film 03").click();
+  pending[1]({ plot: "New selection" });
+  await settle();
+  pending[0]({ plot: "Old selection" });
+  await settle();
+  assert.match(view.$("libraryOverview").textContent, /New selection/);
+  assert.doesNotMatch(view.$("libraryOverview").textContent, /Old selection/);
+  answer(view, "cancel");
+});

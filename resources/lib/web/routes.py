@@ -570,6 +570,29 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_listing(payload)
 
+    def _serve_overview(self) -> None:
+        """Read details only for the selected film, series or episode."""
+        query = parse_qs(urlparse(self.path).query)
+        keys = [name for name in ("movieid", "tvshowid", "episodeid") if name in query]
+        if len(keys) != 1:
+            self._send_error_json(HTTPStatus.BAD_REQUEST, "one library id required")
+            return
+        name = keys[0]
+        enabled = self.server.offer_library if name == "movieid" else self.server.offer_series
+        if not (enabled and self.server.allow_control):
+            self._send_error_json(HTTPStatus.FORBIDDEN, "library disabled")
+            return
+        try:
+            payload = library.overview(name.removesuffix("id"), _param(query, name))
+        except Exception as exc:
+            _log(f"reading library details failed: {exc}", xbmc.LOGWARNING)
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "overview unavailable")
+            return
+        if payload is None:
+            self._send_error_json(HTTPStatus.NOT_FOUND, "no such title")
+            return
+        self._send_json(payload)
+
     def _serve_episodes(self) -> None:
         """Send the episodes of one series (requested when it is opened)."""
         if not (self.server.offer_series and self.server.allow_control):
@@ -804,6 +827,7 @@ _READERS = {
     "/api/history": Handler._serve_history,
     "/api/art": Handler._serve_art,
     "/api/library": Handler._serve_library,
+    "/api/overview": Handler._serve_overview,
     "/api/series": Handler._serve_series,
     "/api/episodes": Handler._serve_episodes,
     "/api/continue": Handler._serve_continue,

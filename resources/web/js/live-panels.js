@@ -553,11 +553,11 @@
     tellRating(node);
   });
 
-  function fillRatings(badges) {
+  function fillRatings(badges, target = el.ratings) {
     const signature = JSON.stringify(badges);
-    if (el.ratings.dataset.signature === signature) return;
-    el.ratings.dataset.signature = signature;
-    el.ratings.replaceChildren();
+    if (target.dataset.signature === signature) return;
+    target.dataset.signature = signature;
+    target.replaceChildren();
     for (const badge of badges) {
       const node = document.createElement("span");
       node.className = "rating " + badge.kind;
@@ -583,9 +583,9 @@
         look.append(figures);
       }
       node.append(said, look);
-      el.ratings.append(node);
+      target.append(node);
     }
-    el.ratings.classList.toggle("hidden", !badges.length);
+    target.classList.toggle("hidden", !badges.length);
   }
 
   /* The poster is fetched once per film: the add-on sends a tag that changes
@@ -1204,6 +1204,43 @@
     chapters.relayout();
   }
 
-  window.TinyPPI.panels = { strings, update, events, peak, draw };
+  function overview(target, media) {
+    const signature = JSON.stringify(media);
+    if (target.dataset.signature === signature) return;
+    target.dataset.signature = signature;
+    target.replaceChildren();
+    const heading = document.createElement("h4");
+    heading.textContent = TinyPPI.T.plot;
+    target.append(heading);
+    target.className = "library-overview plot";
+    for (const [className, value] of [["tagline", media.tagline], ["plottext", media.plot]]) {
+      if (!value) continue;
+      const node = document.createElement("p");
+      node.className = className;
+      node.textContent = value;
+      target.append(node);
+    }
+    const ratings = document.createElement("div");
+    ratings.className = "ratings";
+    ratings.setAttribute("role", "list");
+    ratings.setAttribute("aria-label", TinyPPI.T.ratings);
+    fillRatings(ratingBadges(media, TinyPPI.T), ratings);
+    target.append(ratings);
+    const credits = document.createElement("dl");
+    credits.className = "credits";
+    for (const credit of creditList(media, TinyPPI.T)) {
+      const line = document.createElement("div");
+      const label = document.createElement("dt");
+      label.textContent = credit.label;
+      const names = document.createElement("dd");
+      names.textContent = credit.names;
+      line.append(label, names);
+      credits.append(line);
+    }
+    if (credits.childElementCount) target.append(credits);
+    target.hidden = !media.plot && !media.tagline && ratings.classList.contains("hidden") && !credits.childElementCount;
+  }
+
+  window.TinyPPI.panels = { strings, update, events, peak, draw, overview };
 
 })();
