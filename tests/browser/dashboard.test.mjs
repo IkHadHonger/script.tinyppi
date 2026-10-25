@@ -41,6 +41,7 @@ before(async () => {
   await context.addInitScript((token) => {
     try { localStorage.setItem("tinyppi.token", token); } catch { /* Error pages may deny storage before the real frame loads. */ }
   }, TOKEN);
+  await context.route("**/api/art?**", route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jHHsAAAAASUVORK5CYII=", "base64") }));
   page = await context.newPage();
   page.on("pageerror", (error) => problems.push("page error: " + error.message));
   page.on("console", (message) => {
@@ -322,6 +323,7 @@ test("a press on a film asks, and marking it sends the id", async () => {
   await page.waitForSelector("#markDialog[open]");
   await page.locator("#libraryOverview").filter({ hasText: "The selected library story" }).waitFor();
   assert.ok(await page.locator("#libraryOverview .rating").count() >= 1);
+  await page.locator("#libraryArtwork").waitFor({ state: "visible" });
   // Listened for before the press: the wall may be read again (the library
   // moved) before the click itself has returned.
   const [request] = await Promise.all([
