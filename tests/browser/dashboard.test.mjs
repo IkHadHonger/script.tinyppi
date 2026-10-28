@@ -132,21 +132,24 @@ test("the overview is a key under the playing card that opens the title's detail
     (nodes) => nodes.map((node) => node.getBoundingClientRect().height));
   assert.ok(heights.length && heights.every((height) => height === 28));
   // Nominations retain the award colour at the edge; their plate stays dimmer.
-  const awardEdges = await page.evaluate(() => {
+  const awardEdges = await page.evaluate(async () => {
     const row = document.createElement("div");
     row.className = "ratings";
-    document.getElementById("detailsDialog").append(row);
-    const result = ["oscar", "globe", "bafta", "emmy"].map((award) => {
+    document.getElementById("detailsRatings").prepend(row);
+    const result = [];
+    for (const award of ["oscar", "globe", "bafta", "emmy"]) {
       const badge = document.createElement("span");
       badge.className = "rating award";
       badge.innerHTML = '<span class="side award_' + award + '"></span>';
       row.append(badge);
+      badge.scrollIntoView({ block: "nearest" });
+      await new Promise(requestAnimationFrame);
       const won = getComputedStyle(badge).boxShadow;
       badge.className = "rating nominee";
-      badge.getBoundingClientRect();
-      return { award, won, nominee: getComputedStyle(badge).boxShadow,
-        plate: getComputedStyle(badge.firstChild).opacity };
-    });
+      await new Promise(requestAnimationFrame);
+      result.push({ award, won, nominee: getComputedStyle(badge).boxShadow,
+        plate: getComputedStyle(badge.firstChild).opacity });
+    }
     row.remove();
     return result;
   });
