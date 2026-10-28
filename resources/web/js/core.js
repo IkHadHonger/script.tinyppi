@@ -335,7 +335,8 @@ window.TinyPPI = (function () {
      anyone hovering the light while it does. */
   function setStatus(kind, text) {
     if (!statusEl) return;
-    statusEl.dataset.authRequired = String(kind === "down" && text === T.token_bad);
+    const required = String(kind === "down" && text === T.token_bad);
+    if (statusEl.dataset.authRequired !== required) statusEl.dataset.authRequired = required;
     if (statusEl.dataset.state === kind && statusText.textContent === text) return;
     statusEl.dataset.state = kind;
     statusEl.title = text;
