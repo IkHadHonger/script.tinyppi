@@ -583,7 +583,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.FORBIDDEN, "library disabled")
             return
         try:
-            payload = library.overview(name.removesuffix("id"), _param(query, name))
+            # Keep the fork's legacy endpoint as an alias for the complete
+            # upstream details payload. The dashboard itself uses /api/details.
+            payload = library.title_details(name.removesuffix("id"), _param(query, name))
         except Exception as exc:
             _log(f"reading library details failed: {exc}", xbmc.LOGWARNING)
             self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "overview unavailable")
