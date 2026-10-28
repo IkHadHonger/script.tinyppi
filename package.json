@@ -9,7 +9,7 @@
   "scripts": {
     "lint": "eslint resources/web/js tests/web tests/browser",
     "test": "node --test \"tests/web/*.test.mjs\"",
-    "test:browser": "node --test \"tests/browser/*.test.mjs\"",
+    "test:browser": "node --test --test-timeout=45000 \"tests/browser/*.test.mjs\"",
     "coverage": "node --test --experimental-test-coverage --test-coverage-include=\"resources/web/js/**\" --test-coverage-lines=$npm_package_config_coverage --test-coverage-branches=$npm_package_config_coverage --test-coverage-functions=$npm_package_config_coverage \"tests/web/*.test.mjs\""
   },
   "devDependencies": {
