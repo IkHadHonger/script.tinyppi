@@ -4,6 +4,8 @@
 """Player state and the dashboard's transport commands (web/player.py)."""
 
 import math
+import threading
+import time
 
 import pytest
 
@@ -419,3 +421,101 @@ def test_track_tokens_with_subtitles_on(kodi, audio, subtitle, expected):
         "currentaudiostream": audio, "currentsubtitle": subtitle, "subtitleenabled": True,
     }}
     assert player.current_track_state() == expected
+
+
+# --- Fine adjustments --------------------------------------------------------
+
+@pytest.mark.parametrize(("value", "sent"), [
+    (0.1, 0.1), (-0.3, -0.3), ("0.04", 0.05), (0.012, 0.0), (10, 10.0), (-10, -10.0),
+])
+def test_audio_delay_in_kodis_steps(kodi, value, sent):
+    assert player.apply_command("audio_delay", value)
+    assert kodi.sent("Player.SetAudioDelay") == [{"playerid": 1, "offset": sent}]
+
+
+@pytest.mark.parametrize("value", [None, "x", True, 10.5, -11, float("nan")])
+def test_bad_audio_delays_send_nothing(kodi, value):
+    assert player.apply_command("audio_delay", value) is False
+    assert kodi.sent("Player.SetAudioDelay") == []
+
+
+@pytest.mark.parametrize(("current", "target", "actions"), [
+    ("0.000 s", 0.3, ["subtitledelayplus"] * 3),
+    ("0.500 s", 0.3, ["subtitledelayminus"] * 2),
+    ("-0.200 s", -0.2, []),
+])
+def test_subtitle_delay_steps_from_the_offset_in_force(kodi, current, target, actions):
+    xbmc.INFO["Player.SubtitleDelay"] = current
+    assert player.apply_command("subtitle_delay", target)
+    assert [params["action"] for params in kodi.sent("Input.ExecuteAction")] == actions
+
+
+@pytest.mark.parametrize(("current", "target"), [("", 0.5), ("0.000 s", 61), ("0.000 s", "x")])
+def test_subtitle_delay_needs_an_offset_and_a_target(kodi, current, target):
+    xbmc.INFO["Player.SubtitleDelay"] = current
+    assert player.apply_command("subtitle_delay", target) is False
+    assert kodi.sent("Input.ExecuteAction") == []
+
+
+def test_subtitle_delay_reports_a_refused_step(kodi):
+    xbmc.INFO["Player.SubtitleDelay"] = "0.000 s"
+    kodi.answers["Input.ExecuteAction"] = {"error": {"code": -32100}}
+    assert player.apply_command("subtitle_delay", 1) is False
+    assert len(kodi.sent("Input.ExecuteAction")) == 1        # stops at the first
+
+
+@pytest.mark.parametrize(("current", "target", "action"), [
+    ("-60.000 s", 60, "subtitledelayplus"), ("60.000 s", -60, "subtitledelayminus")])
+def test_subtitle_delay_moves_at_most_a_minute_at_once(kodi, current, target, action):
+    xbmc.INFO["Player.SubtitleDelay"] = current
+    assert player.apply_command("subtitle_delay", target)
+    assert [params["action"] for params in kodi.sent("Input.ExecuteAction")] == [action] * 600
+
+
+def test_subtitle_delay_moves_one_at_a_time(kodi, monkeypatch):
+    """Two taps at once: the second steps from where the first left the
+    offset, not from where both found it."""
+    xbmc.INFO["Player.SubtitleDelay"] = "0.000 s"
+    steps: list[str] = []
+    others: list[threading.Thread] = []
+
+    def step(action):
+        if not others:
+            # The second tap arrives while the first is still moving.
+            others.append(threading.Thread(
+                target=player.apply_command, args=("subtitle_delay", 0.2)))
+            others[0].start()
+            time.sleep(0.05)
+        steps.append(action)
+        moved = player.offset(xbmc.INFO["Player.SubtitleDelay"]) + 0.1
+        xbmc.INFO["Player.SubtitleDelay"] = f"{moved:.3f} s"
+        return True
+
+    monkeypatch.setattr(player, "_input_action", step)
+    assert player.apply_command("subtitle_delay", 0.1)
+    others[0].join(2)
+    assert steps == ["subtitledelayplus"] * 2
+    assert xbmc.INFO["Player.SubtitleDelay"] == "0.200 s"
+
+
+@pytest.mark.parametrize(("value", "sent"), [(True, ["on"]), (False, ["off"]), (1, []), ("on", [])])
+def test_subtitles_shown_or_hidden(kodi, value, sent):
+    assert player.apply_command("subtitles", value) is bool(sent)
+    assert [params["subtitle"] for params in kodi.sent("Player.SetSubtitle")] == sent
+
+
+@pytest.mark.parametrize(("label", "seconds"), [
+    ("0.000 s", 0.0), ("-0.125 s", -0.125), ("+1.5 s", 1.5), ("2", 2.0), ("", None), ("off", None),
+])
+def test_offsets_read_from_their_labels(label, seconds):
+    assert player.offset(label) == seconds
+
+
+def test_player_controls_carry_the_fine_adjustments(kodi):
+    xbmc.INFO["Player.AudioDelay"] = "-0.050 s"
+    xbmc.INFO["Player.SubtitleDelay"] = "0.300 s"
+    state = player.player_controls()
+    assert (state["audio_delay"], state["subtitle_delay"]) == (-0.05, 0.3)
+    kodi.playing = False
+    state = player.player_controls()
+    assert (state["audio_delay"], state["subtitle_delay"]) == (None, None)

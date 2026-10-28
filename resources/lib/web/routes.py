@@ -434,11 +434,11 @@ class Handler(BaseHTTPRequestHandler):
         if not apply_command(action, payload.get("value")):
             self._send_error_json(HTTPStatus.BAD_REQUEST, "command failed")
             return
-        # Seek and volume arrive in bursts, so they log at debug level.
-        _log(
-            f"'{action}' requested from {self._peer}",
-            xbmc.LOGDEBUG if action in ("seek", "seek_percent", "volume") else xbmc.LOGINFO,
-        )
+        # Seek, volume and the offsets arrive in bursts, so they log at debug level.
+        _log(f"'{action}' requested from {self._peer}",
+             xbmc.LOGDEBUG if action in ("seek", "seek_percent", "volume", "audio_delay",
+                                           "subtitle_delay")
+             else xbmc.LOGINFO)
         self._send_json({"ok": True, "action": action})
 
     def _read_json_body(self) -> dict[str, Unchecked] | None:
@@ -583,7 +583,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error_json(HTTPStatus.FORBIDDEN, "library disabled")
             return
         try:
-            payload = library.overview(name.removesuffix("id"), _param(query, name))
+            # Keep the fork's legacy endpoint as an alias for the complete
+            # upstream details payload. The dashboard itself uses /api/details.
+            payload = library.title_details(name.removesuffix("id"), _param(query, name))
         except Exception as exc:
             _log(f"reading library details failed: {exc}", xbmc.LOGWARNING)
             self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "overview unavailable")
@@ -629,6 +631,36 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_listing(payload)
 
+    def _serve_details(self) -> None:
+        """Send one library title's details (``?movieid=``, ``?tvshowid=``
+        or ``?episodeid=``), each kind only with its shelf."""
+        query = parse_qs(urlparse(self.path).query)
+        for key, kind, offered in (
+                ("movieid", "movie", self.server.offer_library),
+                ("tvshowid", "tvshow", self.server.offer_series),
+                ("episodeid", "episode", self.server.offer_series)):
+            item_id = _param(query, key)
+            if not item_id:
+                continue
+            if not (offered and self.server.allow_control):
+                self._send_error_json(HTTPStatus.FORBIDDEN, "library disabled")
+                return
+            self._send_details(kind, item_id)
+            return
+        self._send_error_json(HTTPStatus.BAD_REQUEST, "no title named")
+
+    def _send_details(self, kind: str, item_id: str) -> None:
+        try:
+            payload = library.title_details(kind, item_id)
+        except Exception as exc:
+            _log(f"reading the video database failed: {exc}", xbmc.LOGWARNING)
+            self._send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, "library unavailable")
+            return
+        if payload is None:
+            self._send_error_json(HTTPStatus.NOT_FOUND, "no such title")
+            return
+        self._send_json(payload)
+
     def _send_listing(self, payload: Listing) -> None:
         """Send a library list with its tag as ETag (304 when unchanged)."""
         etag = f'"{payload["tag"]}"'
@@ -666,6 +698,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _find_art(self, query: dict[str, list[str]], kind: str) -> tuple[bytes, str] | None:
         """Return the requested picture and its type, or None."""
+        portrait = _param(query, "portrait")
+        if portrait:
+            return artwork.shelf_picture(library.details.portrait_path(portrait))
         # No library id means the playing title.
         lookups = (("movieid", self.server.library_artwork),
                    ("tvshowid", self.server.series_artwork),
@@ -831,6 +866,7 @@ _READERS = {
     "/api/series": Handler._serve_series,
     "/api/episodes": Handler._serve_episodes,
     "/api/continue": Handler._serve_continue,
+    "/api/details":  Handler._serve_details,
 }
 
 # Write routes (JSON body); they always need the token and control enabled.

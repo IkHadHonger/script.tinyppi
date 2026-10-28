@@ -2,8 +2,8 @@
 # Copyright (c) 2026 U3knOwn
 
 """The playing video over JSON-RPC: tracks, volume, chapters (the count for
-the keys, the list for the dots on the bar), live-TV times and the transport
-commands the dashboard may send."""
+the keys, the list for the dots on the bar), the audio and subtitle
+offsets, live-TV times and the transport commands the dashboard may send."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import json
 import math
 import re
 from collections.abc import Callable, Mapping
+from threading import Lock
 
 import xbmc
 from core.log import channel
@@ -226,7 +227,8 @@ def player_controls() -> Controls:
     """
     state: Controls = {"audio": [], "subtitle": [], "audio_current": -1,
                    "subtitle_current": -1, "subtitle_on": False,
-                   "volume": None, "muted": False, "chapters": 0}
+                   "volume": None, "muted": False, "chapters": 0,
+                   "audio_delay": None, "subtitle_delay": None}
 
     app = rpc("Application.GetProperties",
                {"properties": ["volume", "muted"]}).get("result") or {}
@@ -240,6 +242,9 @@ def player_controls() -> Controls:
 
     # Tells the page whether to show the chapter keys.
     state["chapters"] = chapter_count()
+    # InfoLabels, so the fine adjustments cost no JSON-RPC.
+    state["audio_delay"] = offset(info("Player.AudioDelay"))
+    state["subtitle_delay"] = offset(info("Player.SubtitleDelay"))
 
     properties = rpc("Player.GetProperties", {
         "playerid": player_id,
@@ -289,6 +294,35 @@ def current_track_state() -> dict[str, str]:
     subtitle = (token(result.get("currentsubtitle") or {})
                 if result.get("subtitleenabled") else "__off__")
     return {"audio": audio, "audio_id": audio_id, "subtitle": subtitle}
+
+
+# --- Fine adjustments ------------------------------------------------------
+
+# Kodi moves the audio offset in steps of 25 ms within ten seconds either
+# way (Player.SetAudioDelay), the subtitle offset in steps of 100 ms within
+# a minute either way.  The subtitle offset has no JSON-RPC method: it is
+# moved by input actions, a step each, which show Kodi's own slider on the
+# TV for a moment.
+_AUDIO_DELAY_STEP     = 0.025
+_AUDIO_DELAY_LIMIT    = 10.0
+_SUBTITLE_DELAY_STEP  = 0.1
+_SUBTITLE_DELAY_LIMIT = 60.0
+# The most steps one subtitle request moves: a minute's worth, from either
+# end of the range back to none.  A move from one end to the other (1200
+# keys, each showing Kodi's slider) stops half-way; the next tap goes on.
+_SUBTITLE_DELAY_MAX_STEPS = 600
+# One subtitle move at a time: each works out its steps from the offset in
+# force, and two taps read at once would both step from the same offset.
+_SUBTITLE_DELAY_LOCK = Lock()
+
+# An offset as the InfoLabels write it: "-0.125 s".
+_OFFSET = re.compile(r"\s*([-+]?\d+(?:\.\d+)?)\s*s?\s*")
+
+
+def offset(label: str) -> float | None:
+    """Return an offset InfoLabel ("-0.125 s") in seconds, or None."""
+    found = _OFFSET.fullmatch(label)
+    return round(float(found.group(1)), 3) if found else None
 
 
 # --- Live TV ---------------------------------------------------------------
@@ -456,6 +490,42 @@ def _subtitle(player_id: int, value: Unchecked) -> bool:
         "playerid": player_id, "subtitle": int(index), "enable": True})
 
 
+def _audio_delay(player_id: int, value: Unchecked) -> bool:
+    """Set the audio offset to *value* seconds (rounded to Kodi's steps)."""
+    wanted = _number(value, -_AUDIO_DELAY_LIMIT, _AUDIO_DELAY_LIMIT)
+    if wanted is None:
+        return False
+    steps = round(wanted / _AUDIO_DELAY_STEP)
+    return "result" in rpc("Player.SetAudioDelay", {
+        "playerid": player_id, "offset": round(steps * _AUDIO_DELAY_STEP, 3)})
+
+
+def _subtitle_delay(player_id: int, value: Unchecked) -> bool:
+    """Move the subtitle offset to *value* seconds, a step at a time.
+
+    Worked out from the offset in force, which only the InfoLabel tells.
+    """
+    target = _number(value, -_SUBTITLE_DELAY_LIMIT, _SUBTITLE_DELAY_LIMIT)
+    if target is None:
+        return False
+    with _SUBTITLE_DELAY_LOCK:
+        current = offset(info("Player.SubtitleDelay"))
+        if current is None:
+            return False
+        steps = round((target - current) / _SUBTITLE_DELAY_STEP)
+        steps = max(-_SUBTITLE_DELAY_MAX_STEPS, min(_SUBTITLE_DELAY_MAX_STEPS, steps))
+        action = "subtitledelayplus" if steps > 0 else "subtitledelayminus"
+        return all(_input_action(action) for _ in range(abs(steps)))
+
+
+def _subtitles(player_id: int, value: Unchecked) -> bool:
+    """Show (true) or hide (false) the selected subtitle."""
+    if not isinstance(value, bool):
+        return False
+    return "result" in rpc("Player.SetSubtitle", {
+        "playerid": player_id, "subtitle": "on" if value else "off"})
+
+
 # Commands that need no playing video.  Volume and mute are sent as input
 # actions, like a remote, not via Application.SetVolume/SetMute (Kodi's
 # software mixer).  Only the input path lets a CEC adapter forward them to
@@ -481,6 +551,9 @@ _PLAYER_COMMANDS: dict[str, _PlayerCommand] = {
     "chapter_goto":     _chapter_goto,
     "audio":            _audio,
     "subtitle":         _subtitle,
+    "subtitles":        _subtitles,
+    "audio_delay":      _audio_delay,
+    "subtitle_delay":   _subtitle_delay,
 }
 
 
