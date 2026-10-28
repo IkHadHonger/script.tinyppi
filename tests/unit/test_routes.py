@@ -543,7 +543,7 @@ def test_an_unchanged_static_file_is_304(dashboard, files):
     etag = get(dashboard, "/big.css")[1]["ETag"]
     status, headers, body = get(dashboard, "/big.css", {"If-None-Match": etag})
     assert status == 304 and body == b"" and headers["ETag"] == etag
-    assert headers["X-Frame-Options"] == "DENY"
+    assert headers["X-Frame-Options"] == "SAMEORIGIN"
 
 
 def test_a_routed_file_that_is_gone_is_404(dashboard, files):
