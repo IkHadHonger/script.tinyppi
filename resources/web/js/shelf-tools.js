@@ -77,6 +77,9 @@ function shelfTools(box, { shelf, sorts, filters, onChange }) {
       first();
       onChange();
     });
+    // Attach a populated native control; its real options replace this seed.
+    // This avoids WebKit constructing an empty picker under the page CSP.
+    select.append(document.createElement("option"));
     box.append(select);
     pickers[key] = select;
     return select;
