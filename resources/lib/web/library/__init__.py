@@ -16,17 +16,16 @@ when the series is opened, then cached alongside.
 - ``common``: the JSON-RPC seam and what the rows share
 - ``entries``: the shapes of the lists, as cached and as sent
 - ``films``, ``series``: the two shelves and starting a title
-- ``progress``: the "continue watching" row
+- ``progress``: the "continue watching" and "next up" rows
+- ``details``: one opened title's details
 - ``marks``: seen, unseen and clearing resume points
 
 The rest of the add-on uses only the names below.
 """
 
-from __future__ import annotations
-
-from web.library import cache, common, films, marks, progress, series
+from web.library import cache, common, details, films, marks, progress, series
 from web.library.cache import changed, invalidate, new_cache, revision, settle
-from web.library.details import overview
+from web.library.details import details as title_details
 from web.library.films import art_path, catalogue, movies, play
 from web.library.marks import clear_resume, set_watched
 from web.library.progress import continuing
@@ -41,7 +40,8 @@ from web.library.series import (
 __all__ = [
     "art_path", "catalogue", "changed", "clear_resume", "continuing",
     "episode_art_path", "episodes", "invalidate", "movies", "new_cache",
-    "overview", "play", "play_episode", "revision", "set_watched", "settle",
-    "show_art_path", "shows",
-    "cache", "common", "films", "marks", "progress", "series",
+    "play", "play_episode", "revision", "set_watched", "settle",
+    "show_art_path", "shows", "title_details",
+    "cache", "common", "details", "films", "marks", "progress", "series",
 ]
+

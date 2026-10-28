@@ -159,6 +159,11 @@ film title) has nowhere to run.
   to whatson-api.onrender.com, once per film, with the WhatsOn API key if you
   gave one and nothing else (see
   [Rotten Tomatoes from WhatsOn](Web-Dashboard#rotten-tomatoes-from-whatson)).
+- **The TMDb API key stays on the box.** With one set, opening a title's
+  details sends the title's TMDb or IMDb id to api.themoviedb.org, with the
+  key, to read its credits; a page only ever gets opaque portrait tags,
+  never the key or an image address, and `/api/art` serves only portraits
+  registered that way. Leave it empty and nothing is sent.
 - **File names stay private.** The file path obeys the overlay's **Show file
   name** setting: with it off, the path is not sent to the browser either.
 - **Bounded connections.** One address may hold at most **16** connections
@@ -166,6 +171,10 @@ film title) has nowhere to run.
   most **6** live streams run at once. A browser opens six connections per
   host at most, so the caps only ever turn away something that is not a
   browser.
+- **Portrait paths stay on the box.** Cast thumbnails are served through the
+  existing artwork route and its read authorization. The client receives a
+  tag that resolves only to a portrait path supplied by Kodi, not an arbitrary
+  URL or file path. The in-memory lookup is limited to 4096 entries.
 - **Checked artwork tags.** The `v` tag of an artwork URL goes into the
   `ETag` header only if it is a plain hex tag, so no crafted value can add
   headers to the answer.

@@ -605,16 +605,28 @@ test("a page with neither a card nor a main area has nothing to paint", async ()
   assert.equal(tints.length, 2);
 });
 
-// Authenticated embedded artwork has a data URL, while its cache identity is
-// still the original API address. It must be sampled just like a direct image.
-test("token-loaded data URL posters retain their API tint identity", async () => {
+test("another title's picture gives its own accent, on the adaptive theme alone", async (t) => {
   const view = tinted();
-  const image = view.canvas.poster(4, 4, () => [180, 100, 30]);
-  const url = "/api/art?kind=poster&v=token-cover";
-  image.src = "data:image/png;base64,token-artwork";
-  image.dataset.artworkUrl = url;
-  view.window.TinyPPICover.show(view.card, url, image);
-  await settle();
-  assert.ok(view.card.style.getPropertyValue("--cover-gradient"));
-  assert.ok(view.card.style.getPropertyValue("--cover-accent-rgb"));
+  t.after(() => view.window.close());
+  const image = view.canvas.poster(96, 144, BLUE);
+  image.src = "/other";
+  const accent = await view.window.TinyPPICover.accent("/other", image);
+  assert.equal(accent.length, 3);
+  assert.ok(accent[2] > accent[0], "the blue poster's own colour");
+  // Read once, as the playing poster is.
+  const contexts = view.canvas.log.contexts;
+  await view.window.TinyPPICover.accent("/other", image);
+  assert.equal(view.canvas.log.contexts, contexts);
+  // No address, or another theme: nothing.
+  assert.equal(await view.window.TinyPPICover.accent("", image), null);
+  await view.set("data-theme", "dark");
+  assert.equal(await view.window.TinyPPICover.accent("/other", image), null);
+  // A picture with nothing in it gives none.
+  await view.set("data-theme", "dark-adaptive");
+  const blank = view.canvas.poster(96, 144, BLUE, { loading: true });
+  blank.src = "/gone";
+  const read = view.window.TinyPPICover.accent("/gone", blank);
+  view.canvas.arrive(blank, { failed: true });
+  assert.equal(await read, null);
 });
+
