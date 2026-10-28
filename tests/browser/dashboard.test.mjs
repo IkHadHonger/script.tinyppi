@@ -129,7 +129,7 @@ test("the overview is a key under the playing card that opens the title's detail
   const awardEdges = await page.evaluate(() => {
     const row = document.createElement("div");
     row.className = "ratings";
-    document.body.append(row);
+    document.getElementById("detailsDialog").append(row);
     const result = ["oscar", "globe", "bafta", "emmy"].map((award) => {
       const badge = document.createElement("span");
       badge.className = "rating award";
@@ -137,6 +137,7 @@ test("the overview is a key under the playing card that opens the title's detail
       row.append(badge);
       const won = getComputedStyle(badge).boxShadow;
       badge.className = "rating nominee";
+      badge.getBoundingClientRect();
       return { award, won, nominee: getComputedStyle(badge).boxShadow,
         plate: getComputedStyle(badge.firstChild).opacity };
     });
@@ -216,7 +217,6 @@ test("the overview is a key under the playing card that opens the title's detail
       assert.ok(cards.every((card) => card.height === cards[0].height && card.fits && card.anchored));
     }
     assert.ok(rows.flatMap(({ cards }) => cards).every((card) => card.height < 320), "cards use their content height");
-    await page.locator("#detailsCast").screenshot({ path: `node_modules/credits-${width}.png` });
   }
   await page.locator("#detailsX").click();
   await page.waitForFunction(() => !document.getElementById("detailsDialog").open);
@@ -425,7 +425,6 @@ test("details show all resume actions and marks without clipping on a phone", as
     assert.ok(await button.evaluate((node) => node.scrollWidth <= node.clientWidth && node.scrollHeight <= node.clientHeight), id);
   }
   assert.equal(await page.locator("#detailsWatched").isVisible(), false);
-  await page.locator("#detailsActions").screenshot({ path: "node_modules/details-actions-phone.png" });
   const resumeLabel = await page.locator("#detailsPlay").innerText();
   await page.locator("#detailsClear").click();
   await page.waitForFunction(() => document.getElementById("detailsClear").hidden);
