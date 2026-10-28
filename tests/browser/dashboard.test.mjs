@@ -757,7 +757,9 @@ test("relayed card needs only the local dashboard and keeps remote tokens separa
     assert.equal(controls.length, 8);
     assert.deepEqual(controls[0].postDataJSON(), {origin, path: '/api/command', payload: {action: 'playpause', value: null}});
     assert.deepEqual(controls[7].postDataJSON(), {origin, path: '/api/mode', payload: {mode: 'hdr10'}});
-    await local.locator('#nowCard .control-toggle').click();
+    if (await local.locator('#playerCard .control-toggle').getAttribute('aria-expanded') !== 'true') {
+      await local.locator('#playerCard .control-toggle').click();
+    }
     await Promise.all([
       local.waitForRequest(request => request.url().endsWith('/api/relay/control') &&
         request.postDataJSON().payload.action === 'playpause'),
