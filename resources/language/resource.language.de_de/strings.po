@@ -1504,8 +1504,8 @@ msgid "Show chapter markers"
 msgstr "Kapitelmarken anzeigen"
 
 msgctxt "#32370"
-msgid "Overview"
-msgstr "Überblick"
+msgid "About the film"
+msgstr "Über den Film"
 
 msgctxt "#32372"
 msgid "My rating"
@@ -1518,14 +1518,6 @@ msgstr "Top 250 · Platz %s"
 msgctxt "#32378"
 msgid "Cast"
 msgstr "Darsteller"
-
-msgctxt "#32381"
-msgid "Show more"
-msgstr "Mehr anzeigen"
-
-msgctxt "#32382"
-msgid "Show less"
-msgstr "Weniger anzeigen"
 
 msgctxt "#32383"
 msgid "Ratings"
@@ -1558,3 +1550,335 @@ msgstr "%s gewonnen"
 msgctxt "#32390"
 msgid "%s nominated"
 msgstr "%s nominiert"
+
+msgctxt "#32391"
+msgid "Audio offset"
+msgstr "Audioversatz"
+
+msgctxt "#32392"
+msgid "Subtitle offset"
+msgstr "Untertitelversatz"
+
+msgctxt "#32394"
+msgid "Reset to 0"
+msgstr "Auf 0 zurücksetzen"
+
+msgctxt "#32395"
+msgid "Sort by"
+msgstr "Sortieren nach"
+
+msgctxt "#32396"
+msgid "Title"
+msgstr "Titel"
+
+msgctxt "#32397"
+msgid "Year"
+msgstr "Jahr"
+
+msgctxt "#32398"
+msgid "Rating"
+msgstr "Bewertung"
+
+msgctxt "#32399"
+msgid "Date added"
+msgstr "Hinzugefügt"
+
+msgctxt "#32400"
+msgid "Runtime"
+msgstr "Laufzeit"
+
+msgctxt "#32401"
+msgid "All genres"
+msgstr "Alle Genres"
+
+msgctxt "#32402"
+msgid "All picture formats"
+msgstr "Alle Bildformate"
+
+msgctxt "#32403"
+msgid "All resolutions"
+msgstr "Alle Auflösungen"
+
+msgctxt "#32404"
+msgid "All audio formats"
+msgstr "Alle Tonformate"
+
+msgctxt "#32405"
+msgid "Next up"
+msgstr "Als Nächstes"
+
+msgctxt "#32406"
+msgid "Details"
+msgstr "Details"
+
+msgctxt "#32407"
+msgid "Writer"
+msgstr "Drehbuch"
+
+msgctxt "#32408"
+msgid "Studio"
+msgstr "Studio"
+
+msgctxt "#32409"
+msgid "The details could not be read."
+msgstr "Die Details konnten nicht gelesen werden."
+
+msgctxt "#32410"
+msgid "Genre"
+msgstr "Genre"
+
+msgctxt "#32411"
+msgid "Close"
+msgstr "Schließen"
+
+msgctxt "#32412"
+msgid "No titles match the filter"
+msgstr "Keine Titel passen zum Filter"
+
+msgctxt "#32413"
+msgid "Ascending"
+msgstr "Aufsteigend"
+
+msgctxt "#32414"
+msgid "Descending"
+msgstr "Absteigend"
+
+msgctxt "#32415"
+msgid "Arrange cards"
+msgstr "Karten anordnen"
+
+msgctxt "#32416"
+msgid "Move a card with the arrows, or take it off this tab with the eye. Long-press or right-click any card heading to come back here."
+msgstr "Mit den Pfeilen verschiebst du eine Karte, mit dem Auge nimmst du sie von diesem Tab. Ein langer Druck oder ein Rechtsklick auf eine Kartenüberschrift bringt dich wieder hierher."
+
+msgctxt "#32417"
+msgid "Done"
+msgstr "Fertig"
+
+msgctxt "#32418"
+msgid "Reset"
+msgstr "Zurücksetzen"
+
+msgctxt "#32419"
+msgid "Move up"
+msgstr "Nach oben"
+
+msgctxt "#32420"
+msgid "Move down"
+msgstr "Nach unten"
+
+msgctxt "#32421"
+msgid "Remove card"
+msgstr "Karte entfernen"
+
+msgctxt "#32422"
+msgid "Show card again"
+msgstr "Karte wieder anzeigen"
+
+msgctxt "#32423"
+msgid "Hidden"
+msgstr "Ausgeblendet"
+
+msgctxt "#32424"
+msgid "Every card on this tab is hidden."
+msgstr "Alle Karten auf diesem Tab sind ausgeblendet."
+
+msgctxt "#32425"
+msgid "Tabs"
+msgstr "Tabs"
+
+msgctxt "#32426"
+msgid "Choose which tabs appear in the bar. Live and Settings are always there. Some tabs only appear when there is something to show."
+msgstr "Lege fest, welche Tabs in der Leiste erscheinen. Live und Einstellungen sind immer da. Manche Tabs erscheinen nur, wenn es dort etwas zu zeigen gibt."
+
+msgctxt "#32427"
+msgid "Cards"
+msgstr "Karten"
+
+msgctxt "#32428"
+msgid "Long-press or right-click the heading of a card to move the cards on that tab around, remove them or put them back."
+msgstr "Halte die Überschrift einer Karte gedrückt oder klicke sie mit rechts an, um die Karten dieses Tabs zu verschieben, zu entfernen oder zurückzuholen."
+
+msgctxt "#32429"
+msgid "Reset all cards"
+msgstr "Alle Karten zurücksetzen"
+
+msgctxt "#32430"
+msgid "Every card back in its place on every tab, and every removed card shown again."
+msgstr "Jede Karte auf jedem Tab wieder an ihrem Platz, und jede entfernte Karte wieder da."
+
+msgctxt "#32431"
+msgid "Go to series"
+msgstr "Zur Serie"
+
+msgctxt "#32432"
+msgid "Player"
+msgstr "Player"
+
+msgctxt "#32433"
+msgid "%s episodes"
+msgstr "%s Episoden"
+
+msgctxt "#32434"
+msgid "About the episode"
+msgstr "Über die Folge"
+
+msgctxt "#32435"
+msgid "Awards"
+msgstr "Auszeichnungen"
+
+msgctxt "#32436"
+msgid "Dimmed icons indicate nominations."
+msgstr "Abgedunkelte Symbole kennzeichnen Nominierungen."
+
+msgctxt "#32437"
+msgid "Description"
+msgstr "Beschreibung"
+
+msgctxt "#32438"
+msgid "TMDb API key"
+msgstr "TMDb API-Schlüssel"
+
+msgctxt "#32439"
+msgid "Optional: fill missing cast, director and writer portraits from TMDb, link each person to their TMDb page and show a film's cinema release, budget and box office, in the app and dashboard. Enter your TMDb API key or API read access token. Kodi portraits take priority."
+msgstr "Optional: Fehlende Bilder von Darstellern, Regisseuren und Drehbuchautoren über TMDb ergänzen, jede Person mit ihrer TMDb-Seite verknüpfen und bei Filmen Kinostart, Budget und Eingespieltes zeigen, in App und Dashboard. TMDb API-Schlüssel oder Lesezugriffstoken eingeben. Kodi-Bilder haben Vorrang."
+
+msgctxt "#32440"
+msgid "About the programme"
+msgstr "Über die Sendung"
+
+msgctxt "#32441"
+msgid "In cinemas"
+msgstr "Kinostart"
+
+msgctxt "#32442"
+msgid "Budget"
+msgstr "Budget"
+
+msgctxt "#32443"
+msgid "Box office"
+msgstr "Eingespielt"
+
+msgctxt "#32444"
+msgid "Production country"
+msgstr "Produktionsland"
+
+msgctxt "#32445"
+msgid "Crew"
+msgstr "Filmteam"
+
+msgctxt "#32446"
+msgid "Producer"
+msgstr "Produzent"
+
+msgctxt "#32447"
+msgid "Executive Producer"
+msgstr "Ausführender Produzent"
+
+msgctxt "#32448"
+msgid "Co-Producer"
+msgstr "Koproduzent"
+
+msgctxt "#32449"
+msgid "Associate Producer"
+msgstr "Associate Producer"
+
+msgctxt "#32450"
+msgid "Line Producer"
+msgstr "Herstellungsleitung"
+
+msgctxt "#32451"
+msgid "Original Music Composer"
+msgstr "Filmmusik"
+
+msgctxt "#32452"
+msgid "Music"
+msgstr "Musik"
+
+msgctxt "#32453"
+msgid "Director of Photography"
+msgstr "Kamera"
+
+msgctxt "#32454"
+msgid "Editor"
+msgstr "Schnitt"
+
+msgctxt "#32455"
+msgid "Casting"
+msgstr "Casting"
+
+msgctxt "#32456"
+msgid "Production Design"
+msgstr "Szenenbild"
+
+msgctxt "#32457"
+msgid "Art Direction"
+msgstr "Art Direction"
+
+msgctxt "#32458"
+msgid "Set Decoration"
+msgstr "Set-Dekoration"
+
+msgctxt "#32459"
+msgid "Costume Design"
+msgstr "Kostümbild"
+
+msgctxt "#32460"
+msgid "Makeup Artist"
+msgstr "Maske"
+
+msgctxt "#32461"
+msgid "Visual Effects Supervisor"
+msgstr "VFX-Supervisor"
+
+msgctxt "#32462"
+msgid "Sound Designer"
+msgstr "Sounddesign"
+
+msgctxt "#32463"
+msgid "Stunt Coordinator"
+msgstr "Stuntkoordination"
+
+msgctxt "#32464"
+msgid "Screenplay"
+msgstr "Drehbuch"
+
+msgctxt "#32465"
+msgid "Novel"
+msgstr "Romanvorlage"
+
+msgctxt "#32466"
+msgid "Story"
+msgstr "Geschichte"
+
+msgctxt "#32467"
+msgid "Characters"
+msgstr "Figuren"
+
+msgctxt "#32468"
+msgid "Creator"
+msgstr "Idee"
+
+msgctxt "#32469"
+msgid "Teleplay"
+msgstr "Fernsehdrehbuch"
+
+msgctxt "#32470"
+msgid "Assistant Director"
+msgstr "Regieassistenz"
+
+msgctxt "#32471"
+msgid "Script Supervisor"
+msgstr "Continuity"
+
+msgctxt "#32472"
+msgid "Supervising Sound Editor"
+msgstr "Supervising Sound Editor"
+
+msgctxt "#32473"
+msgid "Profit"
+msgstr "Profit"
+
+msgctxt "#32474"
+msgid "Loss"
+msgstr "Verlust"
