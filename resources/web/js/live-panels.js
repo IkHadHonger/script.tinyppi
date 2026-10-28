@@ -726,12 +726,13 @@
      ignores it, so the call is made whichever one is in force -- the theme can
      change long after the film did (see js/cover-tint.js). */
   function renderArt(art) {
+    if (window.TinyPPIHeroFanart) TinyPPIHeroFanart.show(el.nowCard, art.fanart);
     const tag = art.poster || "";
     if (tag === posterTag) return;
     posterTag = tag;
     if (!tag) {
       el.artBox.classList.add("hidden");
-      el.poster.removeAttribute("src");
+      TinyPPI.loadArtwork(el.poster, "");
       tint("");
       return;
     }
