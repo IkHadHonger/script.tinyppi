@@ -11,7 +11,7 @@ const availability = dashboard.slice(dashboard.indexOf('function tabAvailable(na
   dashboard.indexOf('/* A Dolby Vision title', dashboard.indexOf('function tabAvailable(name) {')));
 const requests = [];
 const renderer = {
-  state: null, control: false, wasPlaying: null,
+  state: null, control: false, wasPlaying: null, hiddenTabs: new Set(),
   offered: {films: true, series: true}, filmsOffered: true, seriesOffered: true,
   TABS: ['live', 'films', 'series', 'history', 'settings'],
   document: {dispatchEvent: () => {}}, CustomEvent: class {},
