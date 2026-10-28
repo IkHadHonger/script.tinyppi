@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { after, before, test } from "node:test";
+import { after, afterEach, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium, webkit } from "playwright";
 
@@ -60,6 +60,12 @@ before(async () => {
 after(async () => {
   await browser?.close();
   server?.kill();
+});
+
+afterEach(async () => {
+  if (page && !page.isClosed()) {
+    await page.locator("dialog[open]").evaluateAll(nodes => nodes.forEach(node => node.close()));
+  }
 });
 
 const tab = async (name) => {
