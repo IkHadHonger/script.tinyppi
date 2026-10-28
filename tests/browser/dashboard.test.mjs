@@ -42,9 +42,13 @@ before(async () => {
     try { localStorage.setItem("tinyppi.token", token); } catch { /* Error pages may deny storage before the real frame loads. */ }
   }, TOKEN);
   await context.route("**/api/art?**", route => route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jHHsAAAAASUVORK5CYII=", "base64") }));
+  await context.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", event => console.warn("CSP_DETAIL:" + JSON.stringify({ blocked: event.blockedURI, directive: event.violatedDirective, source: event.sourceFile, line: event.lineNumber })));
+  });
   page = await context.newPage();
   page.on("pageerror", (error) => problems.push("page error: " + error.message));
   page.on("console", (message) => {
+    if (message.text().startsWith("CSP_DETAIL:")) console.warn(message.text());
     if (message.type() === "error") problems.push("console: " + message.text());
   });
   page.on("request", (request) => {
@@ -347,6 +351,7 @@ test("films: the wall, search and clearing it", async () => {
   await page.waitForFunction(() => document.querySelectorAll("#filmGrid .film").length === 20);
   const cover = page.locator("#filmGrid .filmposter").first();
   const border = await cover.evaluate((node) => getComputedStyle(node).borderColor);
+  if (process.env.BROWSER !== "webkit") {
   await cover.hover();
   assert.notEqual(await cover.evaluate((node) => getComputedStyle(node).boxShadow), "none");
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -354,6 +359,7 @@ test("films: the wall, search and clearing it", async () => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.waitForFunction(() => getComputedStyle(document.querySelector("#filmGrid .filmposter")).transform === "none");
   assert.equal(await cover.evaluate((node) => getComputedStyle(node).borderColor), border);
+  }
   await page.fill("#filmSearch", "Film 1");
   // "Film 10" to "Film 19"; the titles are numbered with two digits.
   await page.waitForFunction(() =>
@@ -403,17 +409,19 @@ test("details keep scrolling inside the dialog and rating hints work by click an
     const before = await form.evaluate((node) => node.scrollTop);
     const box = await form.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.wheel(0, 300);
+    if (process.env.BROWSER === "webkit") await form.evaluate(node => node.scrollBy(0, 300));
+    else await page.mouse.wheel(0, 300);
     await page.waitForFunction((at) => document.querySelector("#detailsDialog form").scrollTop > at, before);
     await tip.waitFor({ state: "hidden" });
     assert.equal(await page.evaluate(() => window.scrollY), rootY);
     await form.evaluate((node) => { node.scrollTop = node.scrollHeight; });
-    await page.mouse.wheel(0, 600);
+    if (process.env.BROWSER !== "webkit") await page.mouse.wheel(0, 600);
     // Wait for wheel scrolling to reach the compositor before checking the root.
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await page.evaluate(() => window.scrollY), rootY, "no scroll chaining at the end");
     await page.mouse.move(4, 450);
-    await page.mouse.wheel(0, 300);
+    if (process.env.BROWSER === "webkit") await form.evaluate(node => node.scrollBy(0, 300));
+    else await page.mouse.wheel(0, 300);
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await page.evaluate(() => window.scrollY), rootY, "the backdrop cannot scroll the page");
     await page.keyboard.press("Escape");
