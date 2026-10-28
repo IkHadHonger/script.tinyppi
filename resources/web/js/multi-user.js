@@ -72,7 +72,8 @@
         else if (document.getElementById('title').textContent !== '—') playing = true;
       }
       if (target) parent.postMessage({type: 'tinyppi-box', playing, user,
-        needsToken: document.getElementById('statusText').textContent === TinyPPI.T.token_bad,
+        needsToken: document.getElementById('status').dataset.authRequired === 'true' ||
+          document.getElementById('statusText').textContent === TinyPPI.T.token_bad,
         tokenDialogOpen: !!document.getElementById('tokenDialog')?.open,
         connected: document.getElementById('status').dataset.state === 'live',
         height: Math.ceil(main.getBoundingClientRect().height +
