@@ -420,7 +420,7 @@ test("a temporary web-app relay failure is retried before artwork is hidden", as
   const delays = [];
   view.window.setTimeout = (callback, delay) => {
     delays.push(delay);
-    Promise.resolve().then(callback);
+    if (delay < 30000) Promise.resolve().then(callback);
     return delays.length;
   };
   let attempts = 0;
@@ -435,8 +435,8 @@ test("a temporary web-app relay failure is retried before artwork is hidden", as
 
   const loaded = await view.window.TinyPPI.loadArtwork(image, "/api/art?kind=poster");
   assert.equal(loaded, false);
-  assert.equal(attempts, 3);
-  assert.deepEqual(delays, [400, 1200]);
+  assert.equal(attempts, 5);
+  assert.deepEqual(delays, [400, 1200, 3000, 7000, 30000]);
   assert.equal(errors, 1, "the card is hidden only after every attempt failed");
 });
 
