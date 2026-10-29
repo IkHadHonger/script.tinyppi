@@ -18,6 +18,7 @@ import urllib.request
 from collections import OrderedDict
 from collections.abc import Callable
 from threading import Lock
+from typing import TypeVar
 from urllib.parse import urlencode
 
 from core import settings
@@ -33,6 +34,7 @@ _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _COUNTRY = re.compile(r"[A-Z]{2}")
 # TMDb's release types that are a run in cinemas: limited and wide.
 _THEATRICAL = (2, 3)
+T = TypeVar("T")
 # The order the crew's departments stand in, the ones a reader looks for
 # first; any other comes after these.
 _DEPARTMENTS = ("Directing", "Writing", "Production", "Sound", "Camera", "Editing", "Art",
@@ -202,8 +204,8 @@ def _profile(person: Json) -> str | None:
     return "https://image.tmdb.org/t/p/w185" + profile if _PROFILE.fullmatch(profile) else None
 
 
-def _unique[T](answer: Json, group: str, role: str,
-               value: Callable[[Json], T | None]) -> dict[str, T]:
+def _unique(answer: Json, group: str, role: str,
+            value: Callable[[Json], T | None]) -> dict[str, T]:
     found: dict[str, set[T]] = {}
     for person in _members(answer, group):
         if not _role(person, role):
