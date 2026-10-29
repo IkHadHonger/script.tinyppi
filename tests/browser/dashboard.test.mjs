@@ -61,6 +61,11 @@ const texts = (selector) => page.locator(selector).allInnerTexts();
 
 test("the live tab connects and shows the format badges", async () => {
   await page.waitForSelector('#status[data-state="live"]');
+  assert.equal(
+    await page.locator('meta[name="apple-mobile-web-app-status-bar-style"]').getAttribute("content"),
+    "black",
+    "the installed iOS app keeps controls below the status bar"
+  );
   await page.waitForFunction(() => document.querySelectorAll(".format").length >= 5);
   const badges = await texts(".format");
   for (const badge of ["UHD", "DV P7.6 FEL", "TrueHD Atmos", "Atmos", "7.1"]) {
