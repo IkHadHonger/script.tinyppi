@@ -117,8 +117,18 @@
     const accent = active.map((box) => box.accent).find(Boolean) || '';
     for (const host of [document.querySelector('.topbar'), document.querySelector('.tabbar')]) {
       if (!host) continue;
-      if (accent) host.style.setProperty('--cover-accent-rgb', accent);
-      else host.style.removeProperty('--cover-accent-rgb');
+      if (accent) {
+        host.style.setProperty('--cover-accent-rgb', accent);
+        /* WebKit does not always recompute a var() chain on an outer page
+           after the value arrived from an embedded frame.  Put the two
+           tokens the selected tab actually paints on the host as well. */
+        host.style.setProperty('--accent', `rgb(${accent})`);
+        host.style.setProperty('--accent-2', `rgb(${accent})`);
+      } else {
+        for (const name of ['--cover-accent-rgb', '--accent', '--accent-2']) {
+          host.style.removeProperty(name);
+        }
+      }
     }
   }
   function describe() {

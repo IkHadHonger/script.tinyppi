@@ -34,4 +34,6 @@ assert.ok(html.includes('/js/multi-user.js'), 'CoreELEC cards remain enabled');
 const multi = fs.readFileSync(path.join(web, 'js/multi-user.js'), 'utf8');
 assert.ok(!multi.includes('tinyppi-infuse-count'), 'Idle summary must only count configured CoreELEC boxes');
 assert.ok(multi.includes('receiveSharedState(snapshot)'), 'Keep the Safari shared-state fix');
+assert.ok(multi.includes("host.style.setProperty('--accent', `rgb(${accent})`)"),
+  'The outer Safari tab bar must receive the active user accent directly');
 console.log('Multi-user address validation: all tests passed.');
