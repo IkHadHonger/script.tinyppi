@@ -641,15 +641,47 @@ window.TinyPPI = (function () {
   }
 
   const artworkLoads = new WeakMap();
+  let artworkObserver = null;
+
+  /* A relayed picture has to be fetched with an authentication header before
+     it can be assigned to an <img>.  Doing that immediately defeats the
+     browser's native loading="lazy": a large library becomes hundreds of
+     blobs and data URLs at once, which is enough for mobile Safari to discard
+     the page.  Observe lazy images ourselves and fetch only the ones close to
+     the viewport. */
+  function deferredArtworkObserver() {
+    if (artworkObserver || typeof IntersectionObserver !== "function") {
+      return artworkObserver;
+    }
+    artworkObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        artworkObserver.unobserve(entry.target);
+        const load = artworkLoads.get(entry.target);
+        if (!load || !load.begin) continue;
+        const begin = load.begin;
+        delete load.begin;
+        begin();
+      }
+    }, { rootMargin: "600px 0px" });
+    return artworkObserver;
+  }
+
   function loadArtwork(image, url) {
     const load = {};
     artworkLoads.set(image, load);
     image.dataset.artworkUrl = url;
-    if (!url) { image.removeAttribute("src"); return; }
+    if (!url) {
+      artworkObserver?.unobserve(image);
+      image.removeAttribute("src");
+      return;
+    }
     if (!embeddedToken() && !relayOrigin) { image.src = url; return; }
     /* A data URL keeps decoded artwork usable by the cover's canvas and the
        fanart background, without a token in an address or a cookie. */
-    return fetch(readURL(url), { headers: tokenHeaders(), credentials: "omit" }).then(async (response) => {
+    const begin = () => fetch(readURL(url), {
+      headers: tokenHeaders(), credentials: "omit"
+    }).then(async (response) => {
       if (!response.ok) throw new Error("artwork refused");
       const blob = await response.blob();
       if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
@@ -666,6 +698,14 @@ window.TinyPPI = (function () {
       if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
       return false;
     });
+
+    const observer = image.loading === "lazy" && deferredArtworkObserver();
+    if (observer) {
+      load.begin = begin;
+      observer.observe(image);
+      return;
+    }
+    return begin();
   }
 
   function openStream() {

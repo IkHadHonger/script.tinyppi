@@ -51,10 +51,12 @@ function fakeEventSource(window, opened) {
  * A page with *scripts* (file names under resources/web/js) loaded in order.
  * *routes* maps a path to [status, body] for fetch.
  */
-export function page({ scripts = ["core.js"], routes = {}, token = "" } = {}) {
+export function page({
+  scripts = ["core.js"], routes = {}, token = "", url = "http://kodi.local:8099/"
+} = {}) {
   const html = readFileSync(join(WEB, "index.html"), "utf8");
   const dom = new JSDOM(html, {
-    url: "http://kodi.local:8099/",
+    url,
     runScripts: "outside-only",
     pretendToBeVisual: true,
   });

@@ -376,6 +376,42 @@ test("blocked storage: defaults stand in and the token lasts as long as the tab"
   assert.equal(view.streams.at(-1).url, "/api/stream");
 });
 
+test("relayed lazy artwork is fetched only when its card approaches the viewport", async () => {
+  const view = page({
+    scripts: [],
+    url: "http://kodi.local:8099/?relay=http%3A%2F%2Feric.local%3A8099"
+  });
+  const observations = [];
+  view.window.IntersectionObserver = class {
+    constructor(callback, options) {
+      this.callback = callback;
+      this.options = options;
+      observations.push(this);
+    }
+    observe(target) { (this.targets ||= new Set()).add(target); }
+    unobserve(target) { this.targets.delete(target); }
+  };
+  load(view.dom, "core.js");
+
+  const first = view.window.document.createElement("img");
+  const second = view.window.document.createElement("img");
+  first.loading = second.loading = "lazy";
+  view.window.TinyPPI.loadArtwork(first, "/api/art?kind=poster&movieid=1");
+  view.window.TinyPPI.loadArtwork(second, "/api/art?kind=poster&movieid=2");
+
+  assert.equal(view.requests.length, 0);
+  assert.equal(observations.length, 1);
+  assert.equal(observations[0].options.rootMargin, "600px 0px");
+  observations[0].callback([{ target: first, isIntersecting: true }]);
+  await settle();
+
+  assert.equal(view.requests.length, 1);
+  assert.match(view.requests[0].url, /^\/api\/relay\?/);
+  assert.match(view.requests[0].url, /movieid%3D1/);
+  assert.equal(observations[0].targets.has(first), false);
+  assert.equal(observations[0].targets.has(second), true);
+});
+
 test("the token dialog's answer becomes the token and reconnects with it", async () => {
   const view = page({ routes: { "/api/hello": [200, {
     strings: { token_title: "Zugangsschlüssel", save: "Speichern", cancel: "Abbrechen" } }] } });
