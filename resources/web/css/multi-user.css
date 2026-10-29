@@ -30,4 +30,13 @@
 .tinyppi-embedded .tabpanel { justify-content: stretch !important; align-content: start !important; }
 .tinyppi-multi #tab-live { align-content: start; }
 .tinyppi-embedded .tabpanel { padding-bottom: 0 !important; }
+/* Mobile Safari can keep a modal dialog's translated starting position in the
+   iframe's horizontal scroll area.  The page then appears to stay beside the
+   user's card until the iframe is swiped sideways.  Embedded cards do not
+   need the sideways page transition: fade their pages instead, keeping the
+   normal slide animation on the standalone dashboard. */
+.tinyppi-embedded #detailsDialog,
+.tinyppi-embedded #seasonsDialog { transition-property: opacity; }
+.tinyppi-embedded #detailsDialog.away,
+.tinyppi-embedded #seasonsDialog.away { transform: none; opacity: 0; }
 #dashboardBoxes { width: 100%; min-height: 85px; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }

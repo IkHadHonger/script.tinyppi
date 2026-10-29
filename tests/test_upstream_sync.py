@@ -33,6 +33,8 @@ class SyncTests(unittest.TestCase):
         layout = (ROOT / 'resources/web/css/multi-user.css').read_text(encoding='utf-8')
         self.assertIn('flex-direction: column', layout)
         self.assertIn('@media (min-width: 900px)', layout)
+        self.assertIn('.tinyppi-embedded #detailsDialog.away', layout)
+        self.assertIn('transform: none; opacity: 0', layout)
 
 
 if __name__ == '__main__':
