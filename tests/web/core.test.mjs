@@ -412,6 +412,34 @@ test("relayed lazy artwork is fetched only when its card approaches the viewport
   assert.equal(observations[0].targets.has(second), true);
 });
 
+test("a temporary web-app relay failure is retried before artwork is hidden", async () => {
+  const view = page({
+    scripts: [], token: "TOKEN",
+    url: "http://kodi.local:8099/?embedded=1"
+  });
+  const delays = [];
+  view.window.setTimeout = (callback, delay) => {
+    delays.push(delay);
+    Promise.resolve().then(callback);
+    return delays.length;
+  };
+  let attempts = 0;
+  view.window.fetch = async () => {
+    attempts += 1;
+    throw new TypeError("relay is still starting");
+  };
+  load(view.dom, "core.js");
+  const image = view.window.document.createElement("img");
+  let errors = 0;
+  image.addEventListener("error", () => { errors += 1; });
+
+  const loaded = await view.window.TinyPPI.loadArtwork(image, "/api/art?kind=poster");
+  assert.equal(loaded, false);
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [400, 1200]);
+  assert.equal(errors, 1, "the card is hidden only after every attempt failed");
+});
+
 test("the token dialog's answer becomes the token and reconnects with it", async () => {
   const view = page({ routes: { "/api/hello": [200, {
     strings: { token_title: "Zugangsschlüssel", save: "Speichern", cancel: "Abbrechen" } }] } });

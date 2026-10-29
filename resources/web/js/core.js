@@ -641,6 +641,7 @@ window.TinyPPI = (function () {
   }
 
   const artworkLoads = new WeakMap();
+  const ARTWORK_RETRY_DELAYS = [400, 1200];
   let artworkObserver = null;
 
   /* A relayed picture has to be fetched with an authentication header before
@@ -679,25 +680,35 @@ window.TinyPPI = (function () {
     if (!embeddedToken() && !relayOrigin) { image.src = url; return; }
     /* A data URL keeps decoded artwork usable by the cover's canvas and the
        fanart background, without a token in an address or a cookie. */
-    const begin = () => fetch(readURL(url), {
-      headers: tokenHeaders(), credentials: "omit"
-    }).then(async (response) => {
-      if (!response.ok) throw new Error("artwork refused");
-      const blob = await response.blob();
-      if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (artworkLoads.get(image) === load) image.src = reader.result;
-          resolve(artworkLoads.get(image) === load);
-        };
-        reader.onerror = () => reject(new Error("artwork decode failed"));
-        reader.readAsDataURL(blob);
+    const begin = () => {
+      let attempt = 0;
+      const request = () => fetch(readURL(url), {
+        headers: tokenHeaders(), credentials: "omit"
+      }).then(async (response) => {
+        if (!response.ok) throw new Error("artwork refused");
+        const blob = await response.blob();
+        if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (artworkLoads.get(image) === load) image.src = reader.result;
+            resolve(artworkLoads.get(image) === load);
+          };
+          reader.onerror = () => reject(new Error("artwork decode failed"));
+          reader.readAsDataURL(blob);
+        });
+      }).catch(async () => {
+        if (artworkLoads.get(image) !== load) return false;
+        if (attempt < ARTWORK_RETRY_DELAYS.length) {
+          const delay = ARTWORK_RETRY_DELAYS[attempt++];
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return artworkLoads.get(image) === load ? request() : false;
+        }
+        image.dispatchEvent(new Event("error"));
+        return false;
       });
-    }).catch(() => {
-      if (artworkLoads.get(image) === load) image.dispatchEvent(new Event("error"));
-      return false;
-    });
+      return request();
+    };
 
     const observer = image.loading === "lazy" && deferredArtworkObserver();
     if (observer) {
