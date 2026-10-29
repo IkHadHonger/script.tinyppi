@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const {origins, isMainDashboard, activeBox, needsRetry} = require('../resources/web/js/multi-user.js');
+const {origins, isMainDashboard, activeBox, needsRetry, accentValue} = require('../resources/web/js/multi-user.js');
 const now = 100000;
 const active = {playing:true, connected:true, updated:99000, attempted:70000};
 assert.equal(activeBox(active, now), true);
@@ -22,6 +22,11 @@ for (const input of ['javascript:alert(1)', 'file:///etc/passwd', 'http://user:s
   assert.throws(() => origins(input, 'http://192.168.1.15:8099'));
 }
 assert.throws(() => origins(Array.from({length:13}, (_, i) => `http://box${i}`).join('\n'), 'http://local'));
+assert.equal(accentValue('211, 102, 88'), '211, 102, 88');
+assert.equal(accentValue(' 0,255, 7 '), '0, 255, 7');
+for (const value of ['', '211, 102', '211, 102, 999', 'red', '1, 2, 3; color:red']) {
+  assert.equal(accentValue(value), '');
+}
 const web = path.join(__dirname, '../resources/web');
 const html = fs.readFileSync(path.join(web, 'index.html'), 'utf8');
 assert.ok(!html.includes('/js/infuse-sessions.js'), 'Dashboard must not load or poll Apple TV/Infuse cards');
