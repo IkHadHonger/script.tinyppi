@@ -469,8 +469,9 @@
         const photo = document.createElement("img");
         photo.alt = "";
         photo.loading = "lazy";
-        photo.src = "/api/art?kind=thumb&portrait=" + encodeURIComponent(person.thumbnail) +
-          "&v=" + encodeURIComponent(person.thumbnail);
+        (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(
+          photo, "/api/art?kind=thumb&portrait=" + encodeURIComponent(person.thumbnail) +
+          "&v=" + encodeURIComponent(person.thumbnail));
         photo.addEventListener("error", () => photo.remove(), { once: true });
         initial.append(photo);
       }
@@ -735,7 +736,7 @@
       return;
     }
     const url = "/api/art?kind=poster&v=" + tag;
-    el.poster.src = url;
+    (TinyPPI.loadArtwork || ((image, address) => { image.src = address; }))(el.poster, url);
     el.artBox.classList.remove("hidden");
     tint(url);
   }

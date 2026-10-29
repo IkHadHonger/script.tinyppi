@@ -496,15 +496,23 @@ test("the finish clock shows as it arrived and takes its label from the strings"
 
 test("the poster is fetched once per tag and handed to the cover tint", (t) => {
   const { $, P, window } = panels(t, { token: "AB" });
+  const loaded = [];
+  window.TinyPPI.loadArtwork = (image, url) => {
+    loaded.push([image.id, url]);
+    image.src = url;
+  };
   // Without the tint script the poster still shows.
   P.update(snap({ art: { poster: "p1" } }));
   assert.equal($("poster").getAttribute("src"), "/api/art?kind=poster&v=p1");
+  assert.deepEqual(loaded, [["poster", "/api/art?kind=poster&v=p1"]]);
   assert.equal($("artBox").classList.contains("hidden"), false);
 
   const shown = [];
   window.TinyPPICover = { show: (card, url, image) => shown.push([card.id, url, image && image.id]) };
   P.update(snap({ art: { poster: "p2" } }));
   P.update(snap({ art: { poster: "p2" } }));
+  assert.deepEqual(loaded.at(-1), ["poster", "/api/art?kind=poster&v=p2"]);
+  assert.equal(loaded.length, 2, "the unchanged poster is not fetched again");
   assert.deepEqual(shown, [["nowCard", "/api/art?kind=poster&v=p2", "poster"]]);
 
   $("poster").dispatchEvent(new window.Event("error"));
