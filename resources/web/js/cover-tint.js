@@ -603,7 +603,15 @@ window.TinyPPICover = (function () {
   /* Resolves once the poster can be read: true when it has pixels, false when
      it never will. */
   function ready(image) {
-    if (image.complete) return Promise.resolve(image.naturalWidth > 0);
+    if (image.complete && image.naturalWidth > 0) return Promise.resolve(true);
+
+    /* Safari reports an empty <img> as complete.  Relayed artwork is fetched
+       first and only then assigned as a data URL, so at this point that empty
+       element is not a failed poster: its load has not started yet.  Waiting
+       for the loader's load/error event keeps a first visit or refresh from
+       caching "no palette" before the picture arrives. */
+    const pending = image.dataset.artworkUrl && !image.getAttribute("src");
+    if (image.complete && !pending) return Promise.resolve(false);
     return new Promise((resolve) => {
       image.addEventListener("load", () => resolve(image.naturalWidth > 0), { once: true });
       image.addEventListener("error", () => resolve(false), { once: true });
