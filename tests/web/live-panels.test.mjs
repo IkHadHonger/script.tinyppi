@@ -1416,6 +1416,29 @@ test("cast portraits load lazily and return to the initial on failure", (t) => {
 
 });
 
+test("very large credits are built in safe batches while every person stays reachable", (t) => {
+  const { P, window } = panels(t);
+  const cast = Array.from({ length: 95 }, (_, index) => ({
+    name: "Person " + index, role: "Job " + index
+  }));
+  const row = P.cast({ cast })[1];
+
+  assert.equal(row.querySelectorAll(".castlink").length, 40);
+  let more = row.querySelector(".castmore");
+  assert.equal(more.textContent, "+55");
+  assert.equal(more.getAttribute("aria-label"), "Cast +55");
+
+  more.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  assert.equal(row.querySelectorAll(".castlink").length, 80);
+  more = row.querySelector(".castmore");
+  assert.equal(more.textContent, "+15");
+
+  more.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  assert.equal(row.querySelectorAll(".castlink").length, 95);
+  assert.equal(row.querySelector(".castmore"), null);
+  assert.equal(row.querySelectorAll("svg.figure").length, 95);
+});
+
 test("a person without a portrait stands on a colour of their own, the one the app gives them", (t) => {
   const { P } = panels(t);
   const row = P.cast({ cast: [{ name: "Actor" }, { name: "Rebecca Ferguson" }, { name: "Léa Seydoux" },
