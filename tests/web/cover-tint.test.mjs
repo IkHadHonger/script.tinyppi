@@ -69,7 +69,9 @@ function fakeCanvas(window) {
   /* A poster *width* by *height* whose pixel at x, y is at(x, y) -- [r, g, b]
      or [r, g, b, a].  *loading* leaves it to arrive later; *naturalHeight*
      and *boxHeight* stand in for an image that knows no height of its own. */
-  function poster(width, height, at, { loading = false, naturalHeight = height, boxHeight = 0 } = {}) {
+  function poster(width, height, at, {
+    loading = false, pending = false, naturalHeight = height, boxHeight = 0
+  } = {}) {
     const image = window.document.createElement("img");
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y++) {
@@ -79,7 +81,11 @@ function fakeCanvas(window) {
       }
     }
     pixels.set(image, { width, height, data });
-    const status = { complete: !loading, naturalWidth: loading ? 0 : width, naturalHeight };
+    const status = {
+      complete: pending || !loading,
+      naturalWidth: loading || pending ? 0 : width,
+      naturalHeight
+    };
     state.set(image, status);
     Object.defineProperties(image, {
       complete: { get: () => status.complete },
@@ -411,6 +417,23 @@ test("a poster still loading is read once it arrives", async () => {
   view.canvas.arrive(image);
   await settle();
   assert.deepEqual(Object.keys(painted(view.card)), PAINTED);
+});
+
+test("Safari's complete empty image waits for relayed artwork to be assigned", async () => {
+  const view = tinted();
+  const image = view.canvas.poster(96, 144, BLUE, { pending: true });
+  image.dataset.artworkUrl = "/relayed";
+
+  view.window.TinyPPICover.show(view.card, "/relayed", image);
+  await settle();
+  assert.deepEqual(painted(view.card), {});
+  assert.equal(view.canvas.log.contexts, 0);
+
+  image.src = "data:image/png;base64,cG9zdGVy";
+  view.canvas.arrive(image);
+  await settle();
+  assert.deepEqual(Object.keys(painted(view.card)), PAINTED);
+  assert.equal(view.canvas.log.contexts, 1);
 });
 
 test("a poster still loading is read once, however often the page repaints meanwhile", async () => {
