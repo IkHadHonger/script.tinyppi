@@ -641,7 +641,8 @@ window.TinyPPI = (function () {
   }
 
   const artworkLoads = new WeakMap();
-  const ARTWORK_RETRY_DELAYS = [400, 1200];
+  const ARTWORK_RETRY_DELAYS = [400, 1200, 3000, 7000];
+  const ARTWORK_BACKGROUND_RETRY = 30000;
   let artworkObserver = null;
 
   /* A relayed picture has to be fetched with an authentication header before
@@ -685,7 +686,11 @@ window.TinyPPI = (function () {
       const request = () => fetch(readURL(url), {
         headers: tokenHeaders(), credentials: "omit"
       }).then(async (response) => {
-        if (!response.ok) throw new Error("artwork refused");
+        if (!response.ok) {
+          const error = new Error("artwork refused");
+          error.permanent = [400, 403, 404].includes(response.status);
+          throw error;
+        }
         const blob = await response.blob();
         if (!blob.type.startsWith("image/")) throw new Error("invalid artwork");
         return new Promise((resolve, reject) => {
@@ -697,14 +702,27 @@ window.TinyPPI = (function () {
           reader.onerror = () => reject(new Error("artwork decode failed"));
           reader.readAsDataURL(blob);
         });
-      }).catch(async () => {
+      }).catch(async (error) => {
         if (artworkLoads.get(image) !== load) return false;
-        if (attempt < ARTWORK_RETRY_DELAYS.length) {
+        if (!error.permanent && attempt < ARTWORK_RETRY_DELAYS.length) {
           const delay = ARTWORK_RETRY_DELAYS[attempt++];
           await new Promise((resolve) => setTimeout(resolve, delay));
           return artworkLoads.get(image) === load ? request() : false;
         }
         image.dispatchEvent(new Event("error"));
+        /* A relay can become ready after the embedded stream already did.
+           Keep the tagged picture recoverable instead of making one short
+           startup race permanent until the whole web app is reloaded. */
+        if (!error.permanent) {
+          load.retryTimer = setTimeout(() => {
+            if (artworkLoads.get(image) !== load) return;
+            if (document.hidden) {
+              load.retryTimer = setTimeout(begin, ARTWORK_BACKGROUND_RETRY);
+              return;
+            }
+            begin();
+          }, ARTWORK_BACKGROUND_RETRY);
+        }
         return false;
       });
       return request();

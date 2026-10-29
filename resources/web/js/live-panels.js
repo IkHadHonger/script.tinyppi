@@ -781,6 +781,14 @@
     el.artBox.classList.add("hidden");
     tint("");
   });
+  /* A relayed poster may arrive on the loader's background retry.  Its tag
+     has not changed, so no new snapshot rendering would otherwise reveal it
+     or restore the adaptive colour. */
+  el.poster.addEventListener("load", () => {
+    if (!posterTag) return;
+    el.artBox.classList.remove("hidden");
+    tint(el.poster.dataset.artworkUrl || "");
+  });
 
   /* The row across the top of the card says only whether playback is held:
      what the source is and what it is converted to are format badges now,
