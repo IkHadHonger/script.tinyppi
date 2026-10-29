@@ -480,6 +480,11 @@ test("a late details response cannot replace the newer title", async (t) => {
 
 test("a broadcast's details are drawn from the snapshot, asking the box nothing", async (t) => {
   const view = await open(t);
+  const artwork = [];
+  view.window.TinyPPI.loadArtwork = (image, url) => {
+    artwork.push([image.id, url]);
+    image.src = url;
+  };
   const asked = view.requests.filter((request) => request.url.startsWith("/api/details")).length;
   await view.window.TinyPPI.openSnapshotDetails({
     title: "Tagesschau", art: { poster: "p1" },
@@ -494,6 +499,7 @@ test("a broadcast's details are drawn from the snapshot, asking the box nothing"
   assert.equal(view.$("detailsPlot").textContent, "Die Nachrichten.");
   // The playing title's pictures, asked for without an id.
   assert.equal(view.$("detailsPoster").getAttribute("src"), "/api/art?kind=poster&v=p1");
+  assert.deepEqual(artwork, [["detailsPoster", "/api/art?kind=poster&v=p1"]]);
   assert.equal(view.$("detailsBackdrop").hidden, true);
   // Each of the cast with who they played, "" where the snapshot says nobody.
   const cast = [...view.$("detailsCast").querySelectorAll(".castrow li")].map((item) =>

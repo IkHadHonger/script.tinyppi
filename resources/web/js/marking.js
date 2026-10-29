@@ -165,7 +165,7 @@ function detailsArt(body, kind, tag) {
    the space it would have filled, as a missing one does. */
 function showPicture(image, url) {
   image.hidden = !url;
-  if (url) image.src = url;
+  if (url) (TinyPPI.loadArtwork || ((target, address) => { target.src = address; }))(image, url);
   else image.removeAttribute("src");
   image.onerror = () => {
     image.hidden = true;

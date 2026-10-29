@@ -435,8 +435,9 @@ function drawSeasonsHead() {
 function seasonPicture(image, kind, tag) {
   image.hidden = !tag;
   if (tag) {
-    image.src = "/api/art?kind=" + kind + "&tvshowid=" + encodeURIComponent(openShow.id) +
-      "&v=" + encodeURIComponent(tag);
+    (TinyPPI.loadArtwork || ((target, address) => { target.src = address; }))(
+      image, "/api/art?kind=" + kind + "&tvshowid=" + encodeURIComponent(openShow.id) +
+      "&v=" + encodeURIComponent(tag));
   } else {
     image.removeAttribute("src");
   }
