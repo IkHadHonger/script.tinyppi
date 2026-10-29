@@ -176,7 +176,10 @@ test("an adaptive page glows in the poster's colour and wears its accent everywh
 
   assert.deepEqual(Object.keys(painted(card)), PAINTED);
   assert.match(card.style.getPropertyValue("--cover-gradient"),
-               /^radial-gradient\(ellipse 155% 105% at 38% 0%, rgba\(.+linear-gradient\(180deg, /);
+               /^radial-gradient\(ellipse at 38% 0%, rgba\(.+linear-gradient\(180deg, /);
+  assert.doesNotMatch(card.style.getPropertyValue("--cover-gradient"),
+                      /radial-gradient\(ellipse \d+%/,
+                      "Safari must accept every layer or it drops the complete tint");
   for (const host of [main, ...chrome]) {
     // The quiet variant: the accent alone, no glow and no text colours.
     assert.deepEqual(Object.keys(painted(host)), ["--cover-accent-rgb"]);
