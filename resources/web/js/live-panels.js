@@ -443,6 +443,47 @@
     ];
   }
 
+  const PEOPLE_BATCH = 40;
+
+  function personCard(person) {
+    const item = document.createElement("li");
+    const initial = document.createElement("span");
+    initial.className = "initial";
+    initial.setAttribute("aria-hidden", "true");
+    /* Under the portrait, and in its place where there is none or it
+       cannot be read: a figure on a colour of the person's own. */
+    initial.style.background = placeholder(person.name);
+    initial.append(personFigure());
+    if (person.thumbnail) {
+      const photo = document.createElement("img");
+      photo.alt = "";
+      photo.loading = "lazy";
+      (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(
+        photo, "/api/art?kind=thumb&portrait=" + encodeURIComponent(person.thumbnail) +
+        "&v=" + encodeURIComponent(person.thumbnail));
+      photo.addEventListener("error", () => photo.remove(), { once: true });
+      initial.append(photo);
+    }
+    const name = document.createElement("strong");
+    name.textContent = person.name;
+    const role = document.createElement("span");
+    role.className = "role";
+    role.textContent = person.role || "";
+    const text = document.createElement("div");
+    text.className = "casttext";
+    text.append(name, role);
+    /* The card is the way to the person's page on TMDb. */
+    const link = document.createElement("a");
+    link.className = "castlink";
+    link.href = personPage(person);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.draggable = false;
+    link.append(initial, text);
+    item.append(link);
+    return item;
+  }
+
   function castCards(credits, title) {
     const cast = credits.cast || [];
     if (!cast.length) return [];
@@ -456,50 +497,39 @@
     heading.append(title, count);
     const row = document.createElement("ul");
     row.className = "castrow";
-    for (const person of cast) {
-      const item = document.createElement("li");
-      const initial = document.createElement("span");
-      initial.className = "initial";
-      initial.setAttribute("aria-hidden", "true");
-      /* Under the portrait, and in its place where there is none or it
-         cannot be read: a figure on a colour of the person's own. */
-      initial.style.background = placeholder(person.name);
-      initial.append(personFigure());
-      if (person.thumbnail) {
-        const photo = document.createElement("img");
-        photo.alt = "";
-        photo.loading = "lazy";
-        (TinyPPI.loadArtwork || ((image, url) => { image.src = url; }))(
-          photo, "/api/art?kind=thumb&portrait=" + encodeURIComponent(person.thumbnail) +
-          "&v=" + encodeURIComponent(person.thumbnail));
-        photo.addEventListener("error", () => photo.remove(), { once: true });
-        initial.append(photo);
+    const unknown = document.createElement("li");
+    unknown.className = "more";
+    unknown.textContent = "\u2026";
+    let shown = 0;
+    const batch = document.createElement("li");
+    batch.className = "batchmore";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "castmore";
+    batch.append(button);
+
+    /* A blockbuster may carry hundreds of TMDb crew members.  Constructing
+       every portrait card and silhouette in one turn can make mobile Safari
+       discard the page.  Keep the whole list available, but build it in
+       bounded portions when the reader asks for the next one. */
+    const appendBatch = () => {
+      batch.remove();
+      unknown.remove();
+      const end = Math.min(cast.length, shown + PEOPLE_BATCH);
+      const fragment = document.createDocumentFragment();
+      for (; shown < end; shown++) fragment.append(personCard(cast[shown]));
+      row.append(fragment);
+      if (shown < cast.length) {
+        const remaining = cast.length - shown;
+        button.textContent = "+" + remaining;
+        button.setAttribute("aria-label", title + " +" + remaining);
+        row.append(batch);
+      } else if (credits.cast_more) {
+        row.append(unknown);
       }
-      const name = document.createElement("strong");
-      name.textContent = person.name;
-      const role = document.createElement("span");
-      role.className = "role";
-      role.textContent = person.role || "";
-      const text = document.createElement("div");
-      text.className = "casttext";
-      text.append(name, role);
-      /* The card is the way to the person's page on TMDb. */
-      const link = document.createElement("a");
-      link.className = "castlink";
-      link.href = personPage(person);
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.draggable = false;
-      link.append(initial, text);
-      item.append(link);
-      row.append(item);
-    }
-    if (credits.cast_more) {
-      const more = document.createElement("li");
-      more.className = "more";
-      more.textContent = "\u2026";
-      row.append(more);
-    }
+    };
+    button.addEventListener("click", appendBatch);
+    appendBatch();
     mouseScroll(row);
     return [heading, row];
   }
