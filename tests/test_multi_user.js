@@ -24,6 +24,8 @@ for (const input of ['javascript:alert(1)', 'file:///etc/passwd', 'http://user:s
 assert.throws(() => origins(Array.from({length:13}, (_, i) => `http://box${i}`).join('\n'), 'http://local'));
 assert.equal(accentValue('211, 102, 88'), '211, 102, 88');
 assert.equal(accentValue(' 0,255, 7 '), '0, 255, 7');
+assert.equal(accentValue('rgb(211, 102, 88)'), '211, 102, 88');
+assert.equal(accentValue('rgba(211, 102, 88, 1)'), '211, 102, 88');
 for (const value of ['', '211, 102', '211, 102, 999', 'red', '1, 2, 3; color:red']) {
   assert.equal(accentValue(value), '');
 }
@@ -36,4 +38,6 @@ assert.ok(!multi.includes('tinyppi-infuse-count'), 'Idle summary must only count
 assert.ok(multi.includes('receiveSharedState(snapshot)'), 'Keep the Safari shared-state fix');
 assert.ok(multi.includes("host.style.setProperty('--accent', `rgb(${accent})`)"),
   'The outer Safari tab bar must receive the active user accent directly');
+assert.ok(multi.includes("getComputedStyle(selected).backgroundColor"),
+  'Copy the colour Safari actually painted on the embedded selected tab');
 console.log('Multi-user address validation: all tests passed.');

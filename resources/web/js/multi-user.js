@@ -25,7 +25,10 @@
     return now - box.updated >= 12000 && now - box.attempted >= 30000;
   }
   function accentValue(value) {
-    const parts = String(value || '').split(',').map((part) => part.trim());
+    const text = String(value || '').trim();
+    const painted = /^rgba?\(\s*(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*[,/]\s*[\d.]+)?\s*\)$/i.exec(text);
+    const parts = (painted ? painted.slice(1, 4) : text.split(','))
+      .map((part) => part.trim());
     return parts.length === 3 && parts.every((part) => /^(?:\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])$/.test(part))
       ? parts.join(', ') : '';
   }
@@ -76,8 +79,12 @@
         if (idle && !idle.classList.contains('hidden')) playing = false;
         else if (document.getElementById('title').textContent !== '—') playing = true;
       }
-      const accent = accentValue(getComputedStyle(document.querySelector('.tabbar'))
-        .getPropertyValue('--cover-accent-rgb'));
+      /* Copy what WebKit actually painted on the selected key.  Reading the
+         intermediate custom property can yield its unresolved var() text in
+         an iframe even though the button on screen already has the right
+         colour. */
+      const selected = navigation.querySelector('.tab.on .tabicon');
+      const accent = accentValue(selected && getComputedStyle(selected).backgroundColor);
       if (target) parent.postMessage({type: 'tinyppi-box', playing, user, accent,
         needsToken: document.getElementById('statusText').textContent === TinyPPI.T.token_bad,
         tokenDialogOpen: !!document.getElementById('tokenDialog')?.open,
