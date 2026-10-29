@@ -24,6 +24,11 @@
   function needsRetry(box, now) {
     return now - box.updated >= 12000 && now - box.attempted >= 30000;
   }
+  function accentValue(value) {
+    const parts = String(value || '').split(',').map((part) => part.trim());
+    return parts.length === 3 && parts.every((part) => /^(?:\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])$/.test(part))
+      ? parts.join(', ') : '';
+  }
   function localSnapshot(box, event, own) {
     // Only the configured own frame may populate the outer box's library and
     // statistics. Never accept another user's player state or a forged sender.
@@ -33,7 +38,7 @@
     return snapshot && typeof snapshot.playing === 'boolean' &&
       typeof snapshot.control === 'boolean' ? snapshot : null;
   }
-  if (typeof module !== 'undefined') { module.exports = { origins, isMainDashboard, activeBox, needsRetry, localSnapshot }; return; }
+  if (typeof module !== 'undefined') { module.exports = { origins, isMainDashboard, activeBox, needsRetry, localSnapshot, accentValue }; return; }
   const embedded = new URLSearchParams(location.search).get('embedded') === '1';
   const panel = document.getElementById('tab-live');
   if (!panel) return;
@@ -71,7 +76,9 @@
         if (idle && !idle.classList.contains('hidden')) playing = false;
         else if (document.getElementById('title').textContent !== '—') playing = true;
       }
-      if (target) parent.postMessage({type: 'tinyppi-box', playing, user,
+      const accent = accentValue(getComputedStyle(document.querySelector('.tabbar'))
+        .getPropertyValue('--cover-accent-rgb'));
+      if (target) parent.postMessage({type: 'tinyppi-box', playing, user, accent,
         needsToken: document.getElementById('statusText').textContent === TinyPPI.T.token_bad,
         tokenDialogOpen: !!document.getElementById('tokenDialog')?.open,
         connected: document.getElementById('status').dataset.state === 'live',
@@ -86,6 +93,7 @@
       snapshot = event.detail.snapshot || null;
     });
     document.addEventListener('tinyppi-user', (event) => { user = event.detail || ''; });
+    document.addEventListener('tinyppi-tint', report);
     new ResizeObserver(report).observe(main);
     setInterval(report, 2000);
     report();
@@ -105,6 +113,14 @@
   summary.className = 'user-dashboards-summary';
   panel.append(summary, row);
   let boxes = [];
+  function paintChrome(active) {
+    const accent = active.map((box) => box.accent).find(Boolean) || '';
+    for (const host of [document.querySelector('.topbar'), document.querySelector('.tabbar')]) {
+      if (!host) continue;
+      if (accent) host.style.setProperty('--cover-accent-rgb', accent);
+      else host.style.removeProperty('--cover-accent-rgb');
+    }
+  }
   function describe() {
     const now = Date.now();
     const active = boxes.filter((box) => activeBox(box, now));
@@ -115,6 +131,7 @@
       box.frame.setAttribute('aria-hidden', String(!visible));
     }
     row.classList.toggle('single-user', active.length === 1);
+    paintChrome(active);
     summary.textContent = active.length ? '' : 'Geen actieve gebruikers';
     if (boxes.length) {
       const connected = boxes.some((box) => box.connected === true && now - box.updated < 12000);
@@ -183,6 +200,7 @@
     box.tokenDialogOpen = event.data.tokenDialogOpen === true;
     if (box.tokenDialogOpen || box.connected) box.authorizing = false;
     box.user = typeof event.data.user === 'string' ? event.data.user.slice(0, 120) : '';
+    box.accent = accentValue(event.data.accent);
     const snapshot = localSnapshot(box, event, location.origin);
     if (snapshot) TinyPPI.receiveSharedState(snapshot);
     if (Number.isFinite(event.data.height)) {
