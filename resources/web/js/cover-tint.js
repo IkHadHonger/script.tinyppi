@@ -458,12 +458,16 @@ window.TinyPPICover = (function () {
     const deep = deepen(held, 0.72);
 
     return [
-      "radial-gradient(ellipse 155% 105% at 38% 0%, " +
+      /* Safari rejects explicit percentage radii in this form and, because
+         the value contains several layers, then drops the whole background.
+         An ellipse with its size chosen from the box gives the same broad
+         glow while keeping the complete gradient valid there. */
+      "radial-gradient(ellipse at 38% 0%, " +
         rgbaText(held, 0.86) + " 0%, " +
         rgbaText(held, 0.56) + " 36%, " +
         rgbaText(deep, 0.20) + " 68%, " +
         rgbaText(deep, 0) + " 94%)",
-      "radial-gradient(ellipse 120% 72% at 100% 34%, " +
+      "radial-gradient(ellipse at 100% 34%, " +
         rgbaText(held, 0.18) + " 0%, " +
         rgbaText(deep, 0.07) + " 58%, " +
         rgbaText(deep, 0) + " 86%)",
