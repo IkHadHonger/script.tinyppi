@@ -2,14 +2,15 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var isEditingServer = false
+    @State private var editor: SettingsEditor?
+    @State private var connectionTest: ConnectionTestResult?
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 serverCard
                 settingsSections
-                Text("TinyPPI iOS 1.5.2  •  Backend 2.22.0")
+                Text("TinyPPI iOS 1.5.3  •  Backend 2.22.0")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -20,17 +21,18 @@ struct SettingsView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Instellingen")
         .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $isEditingServer) {
+        .sheet(item: $editor) { editor in
             NavigationStack {
-                ServerEditorView(configuration: model.configuration) { configuration in
+                ServerEditorView(configuration: model.configuration, mode: editor) { configuration in
                     model.updateConfiguration(configuration)
-                    Task { await model.connect() }
+                    connectionTest = nil
+                    Task { _ = await model.connect() }
                 }
                 .environmentObject(model)
             }
         }
         .onAppear {
-            if model.configuration.host.isEmpty { isEditingServer = true }
+            if model.configuration.host.isEmpty { editor = .all }
         }
     }
 
@@ -64,7 +66,13 @@ struct SettingsView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    Task { await model.connect() }
+                    connectionTest = nil
+                    Task {
+                        let succeeded = await model.connect()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            connectionTest = succeeded ? .success : .failure
+                        }
+                    }
                 } label: {
                     HStack(spacing: 7) {
                         if model.isConnecting { ProgressView().controlSize(.small) }
@@ -76,8 +84,16 @@ struct SettingsView: View {
                 .buttonStyle(TinyPPIButtonStyle(filled: true))
                 .disabled(model.configuration.host.isEmpty || model.isConnecting)
 
-                Button("Wijzig") { isEditingServer = true }
+                Button("Wijzig") { editor = .all }
                     .buttonStyle(TinyPPIButtonStyle(filled: false))
+            }
+
+            if let connectionTest {
+                Label(connectionTest.message, systemImage: connectionTest.icon)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(connectionTest.color)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(18)
@@ -89,11 +105,11 @@ struct SettingsView: View {
         VStack(spacing: 22) {
             SettingsGroup(title: "SERVER") {
                 SettingsRow(icon: "server.rack", tint: .orange, title: "Serververbinding", value: serverAddress) {
-                    isEditingServer = true
+                    editor = .server
                 }
                 Divider().padding(.leading, 48)
                 SettingsRow(icon: "key.fill", tint: .blue, title: "Toegangstoken", value: model.configuration.token.isEmpty ? "Niet ingesteld" : "Ingesteld") {
-                    isEditingServer = true
+                    editor = .token
                 }
             }
 
@@ -157,43 +173,68 @@ struct SettingsView: View {
     }
 }
 
+private enum SettingsEditor: String, Identifiable {
+    case server, token, all
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .server: return "Serververbinding"
+        case .token: return "Toegangstoken"
+        case .all: return "Verbinding wijzigen"
+        }
+    }
+}
+
+private enum ConnectionTestResult {
+    case success, failure
+    var message: String { self == .success ? "Verbinding geslaagd" : "Verbinding mislukt" }
+    var icon: String { self == .success ? "checkmark.circle.fill" : "xmark.circle.fill" }
+    var color: Color { self == .success ? .green : .red }
+}
+
 private struct ServerEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var model: AppModel
     @State private var configuration: ServerConfiguration
     @State private var showsToken = false
+    let mode: SettingsEditor
     let onSave: (ServerConfiguration) -> Void
 
-    init(configuration: ServerConfiguration, onSave: @escaping (ServerConfiguration) -> Void) {
+    init(configuration: ServerConfiguration, mode: SettingsEditor, onSave: @escaping (ServerConfiguration) -> Void) {
         _configuration = State(initialValue: configuration)
+        self.mode = mode
         self.onSave = onSave
     }
 
     var body: some View {
         Form {
             Section {
-                TextField("IP-adres of hostnaam", text: $configuration.host)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                TextField("Poort", value: $configuration.port, format: .number).keyboardType(.numberPad)
-                HStack {
-                    Group {
-                        if showsToken { TextField("Toegangstoken", text: $configuration.token) }
-                        else { SecureField("Toegangstoken", text: $configuration.token) }
+                if mode != .token {
+                    TextField("IP-adres of hostnaam", text: $configuration.host)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                    TextField("Poort", value: $configuration.port, format: .number).keyboardType(.numberPad)
+                }
+                if mode != .server {
+                    HStack {
+                        Group {
+                            if showsToken { TextField("Toegangstoken", text: $configuration.token) }
+                            else { SecureField("Toegangstoken", text: $configuration.token) }
+                        }
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Button { showsToken.toggle() } label: {
+                            Image(systemName: showsToken ? "eye.slash" : "eye").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(showsToken ? "Token verbergen" : "Token tonen")
                     }
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    Button { showsToken.toggle() } label: {
-                        Image(systemName: showsToken ? "eye.slash" : "eye").foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(showsToken ? "Token verbergen" : "Token tonen")
                 }
             } header: {
-                Text("TinyPPI-server")
+                Text(mode == .token ? "Beveiliging" : "TinyPPI-server")
             } footer: {
-                Text("Gebruik het adres en token uit TinyPPI → Instellingen → Dashboard → Adres en token tonen. De standaardpoort is 8099.")
+                Text(editorHelp)
             }
 
-            if !model.configuration.host.isEmpty {
+            if mode == .all && !model.configuration.host.isEmpty {
                 Section {
                     Button("Verbinding verwijderen", role: .destructive) {
                         model.removeConfiguration()
@@ -203,7 +244,7 @@ private struct ServerEditorView: View {
                 }
             }
         }
-        .navigationTitle("Serververbinding")
+        .navigationTitle(mode.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Annuleer") { dismiss() } }
@@ -213,8 +254,16 @@ private struct ServerEditorView: View {
                     dismiss()
                 }
                 .fontWeight(.semibold)
-                .disabled(configuration.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(mode != .token && configuration.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+        }
+    }
+
+    private var editorHelp: String {
+        switch mode {
+        case .server: return "Vul het IP-adres of de hostnaam van je TinyPPI-box in. De standaardpoort is 8099."
+        case .token: return "Gebruik het toegangstoken uit TinyPPI → Instellingen → Dashboard → Adres en token tonen."
+        case .all: return "Gebruik het adres en token uit TinyPPI → Instellingen → Dashboard → Adres en token tonen. De standaardpoort is 8099."
         }
     }
 }
@@ -309,7 +358,7 @@ private struct AboutTinyPPIView: View {
         List {
             Section {
                 LabeledContent("App", value: "TinyPPI iOS")
-                LabeledContent("Versie", value: "1.5.2")
+                LabeledContent("Versie", value: "1.5.3")
                 LabeledContent("Ondersteunde backend", value: "TinyPPI 2.22.0")
             }
         }

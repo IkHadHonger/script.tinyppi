@@ -27,10 +27,11 @@ final class AppModel: ObservableObject {
 
     func start() async {
         guard configuration.baseURL != nil else { return }
-        await connect()
+        _ = await connect()
     }
 
-    func connect() async {
+    @discardableResult
+    func connect() async -> Bool {
         pollingTask?.cancel()
         isConnecting = true
         errorMessage = nil
@@ -41,9 +42,13 @@ final class AppModel: ObservableObject {
             save()
             isConnecting = false
             await refresh()
+            return true
         } catch {
             isConnecting = false
+            hello = nil
+            state = nil
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
