@@ -9,7 +9,7 @@ struct SettingsView: View {
             VStack(spacing: 24) {
                 serverCard
                 settingsSections
-                Text("TinyPPI iOS 1.5.0  •  Backend 2.22.0")
+                Text("TinyPPI iOS 1.5.1  •  Backend 2.22.0")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -94,6 +94,24 @@ struct SettingsView: View {
                 Divider().padding(.leading, 48)
                 SettingsRow(icon: "key.fill", tint: .blue, title: "Toegangstoken", value: model.configuration.token.isEmpty ? "Niet ingesteld" : "Ingesteld") {
                     isEditingServer = true
+                }
+            }
+
+            if let url = model.configuration.baseURL {
+                SettingsGroup(title: "DASHBOARD") {
+                    NavigationLink {
+                        DashboardWebView(baseURL: url, token: model.configuration.token, selectedTab: "settings")
+                            .navigationTitle("Boxen en dashboard")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        SettingsRowLabel(
+                            icon: "rectangle.3.group.fill",
+                            tint: .teal,
+                            title: "Boxen en dashboard",
+                            value: "Geavanceerd"
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -273,7 +291,7 @@ private struct AboutTinyPPIView: View {
         List {
             Section {
                 LabeledContent("App", value: "TinyPPI iOS")
-                LabeledContent("Versie", value: "1.5.0")
+                LabeledContent("Versie", value: "1.5.1")
                 LabeledContent("Ondersteunde backend", value: "TinyPPI 2.22.0")
             }
         }

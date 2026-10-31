@@ -76,7 +76,11 @@ private struct DashboardTabBar: View {
         HStack(spacing: 2) {
             ForEach(DashboardTab.allCases) { tab in
                 Button {
-                    selection = tab
+                    if tab == .settings {
+                        openServerSettings()
+                    } else {
+                        selection = tab
+                    }
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.icon)
@@ -93,13 +97,6 @@ private struct DashboardTabBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
-                .contextMenu {
-                    if tab == .settings {
-                        Button(action: openServerSettings) {
-                            Label("Serververbinding", systemImage: "server.rack")
-                        }
-                    }
-                }
             }
         }
         .padding(.horizontal, 6)
