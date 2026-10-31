@@ -18,20 +18,6 @@ struct DashboardWebView: UIViewRepresentable {
         configuration.userContentController.addUserScript(
             WKUserScript(source: tokenScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
-        let persistentTabBarScript = """
-        (() => {
-          const keepTabBarVisible = () => document.documentElement.classList.remove('bar-away');
-          keepTabBarVisible();
-          new MutationObserver(keepTabBarVisible).observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['class']
-          });
-        })();
-        """
-        configuration.userContentController.addUserScript(
-            WKUserScript(source: persistentTabBarScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
-        )
-
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
