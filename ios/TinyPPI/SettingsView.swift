@@ -36,7 +36,7 @@ struct SettingsView: View {
                 }
             }
             Section("Over") {
-                LabeledContent("App", value: "TinyPPI iOS 1.0")
+                LabeledContent("App", value: "TinyPPI iOS 1.1")
                 LabeledContent("Backend", value: "TinyPPI 2.22.0")
             }
         }

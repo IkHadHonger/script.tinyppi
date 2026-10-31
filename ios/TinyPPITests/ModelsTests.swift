@@ -13,5 +13,13 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(state.sequence, 4)
         XCTAssertEqual(state.title, "")
     }
+
+    func testMovieLibraryDecoding() throws {
+        let data = Data(#"{"movies":[{"id":12,"title":"Arrival","year":2016,"poster":"abc123","video":"hdr10"}],"count":1}"#.utf8)
+        let library = try JSONDecoder().decode(MovieLibrary.self, from: data)
+        XCTAssertEqual(library.count, 1)
+        XCTAssertEqual(library.movies.first?.displayTitle, "Arrival")
+        XCTAssertEqual(library.movies.first?.subtitle, "2016 · HDR10")
+    }
 }
 

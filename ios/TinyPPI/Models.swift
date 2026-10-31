@@ -93,3 +93,49 @@ struct InfoRow: Decodable, Identifiable, Equatable {
     }
 }
 
+struct MovieLibrary: Decodable {
+    let movies: [LibraryItem]
+    let count: Int
+}
+
+struct SeriesLibrary: Decodable {
+    let shows: [LibraryItem]
+    let count: Int
+}
+
+struct ContinueLibrary: Decodable {
+    let items: [LibraryItem]
+    let next: [LibraryItem]
+    let count: Int
+}
+
+struct LibraryItem: Decodable, Identifiable, Hashable {
+    let id: Int
+    var kind: String?
+    let title: String
+    let show: String?
+    let year: Int?
+    let season: Int?
+    let episode: Int?
+    let duration: Double?
+    let resume: Double?
+    let rating: Double?
+    let watched: Bool?
+    let poster: String?
+    let thumb: String?
+    let video: String?
+    let resolution: String?
+    let audio: String?
+    let genres: [String]?
+
+    var displayTitle: String { show ?? title }
+    var subtitle: String {
+        if let season, let episode { return "S\(season) · E\(episode) — \(title)" }
+        var parts: [String] = []
+        if let year { parts.append(String(year)) }
+        if let resolution { parts.append(resolution) }
+        if let video { parts.append(video.uppercased()) }
+        return parts.joined(separator: " · ")
+    }
+}
+

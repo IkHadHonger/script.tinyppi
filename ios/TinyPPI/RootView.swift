@@ -9,6 +9,8 @@ struct RootView: View {
                 .tabItem { Label("Live", systemImage: "waveform.path.ecg") }
             NavigationStack { PlayerView() }
                 .tabItem { Label("Player", systemImage: "play.circle.fill") }
+            NavigationStack { LibraryView() }
+                .tabItem { Label("Bibliotheek", systemImage: "rectangle.stack.fill") }
             NavigationStack { SettingsView() }
                 .tabItem { Label("Instellingen", systemImage: "gearshape.fill") }
         }

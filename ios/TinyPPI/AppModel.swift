@@ -7,6 +7,11 @@ final class AppModel: ObservableObject {
     @Published var state: PlayerState?
     @Published var isConnecting = false
     @Published var errorMessage: String?
+    @Published var movies: [LibraryItem] = []
+    @Published var shows: [LibraryItem] = []
+    @Published var continueItems: [LibraryItem] = []
+    @Published var nextEpisodes: [LibraryItem] = []
+    @Published var isLoadingLibrary = false
 
     private var pollingTask: Task<Void, Never>?
     private let defaults = UserDefaults.standard
@@ -55,6 +60,39 @@ final class AppModel: ObservableObject {
     func send(_ action: String, value: Double? = nil) async {
         do {
             try await TinyPPIClient(configuration: configuration).command(action, value: value)
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadLibrary() async {
+        guard configuration.baseURL != nil else { return }
+        isLoadingLibrary = true
+        let client = TinyPPIClient(configuration: configuration)
+        async let movieResponse = try? client.movies()
+        async let seriesResponse = try? client.series()
+        async let continueResponse = try? client.continueWatching()
+        let (movieResult, seriesResult, continueResult) = await (movieResponse, seriesResponse, continueResponse)
+        movies = movieResult?.movies ?? []
+        shows = (seriesResult?.shows ?? []).map { item in
+                var show = item
+                show.kind = "tvshow"
+                return show
+        }
+        continueItems = continueResult?.items ?? []
+        nextEpisodes = continueResult?.next ?? []
+        if movieResult == nil && seriesResult == nil && continueResult == nil {
+            errorMessage = "De bibliotheek is niet beschikbaar. Schakel Film- of Seriebibliotheek en dashboardbediening in bij TinyPPI."
+        } else {
+            errorMessage = nil
+        }
+        isLoadingLibrary = false
+    }
+
+    func play(_ item: LibraryItem, restart: Bool = false) async {
+        do {
+            try await TinyPPIClient(configuration: configuration).play(item, restart: restart)
             await refresh()
         } catch {
             errorMessage = error.localizedDescription

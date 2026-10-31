@@ -9,9 +9,10 @@ Native SwiftUI client for the TinyPPI 2.22.0 dashboard API.
 2. Use **Show address and token** and enter both in the app's Settings tab.
 3. Keep the default port `8099`, unless it was changed on the box.
 
-The first release implements server configuration, `/api/hello`, polling of
-`/api/state`, the Live information cards and player play/pause, seek and stop
-commands through `/api/command`.
+The app implements server configuration, `/api/hello`, polling of `/api/state`,
+the Live information cards and player commands. Its library tab reads films,
+series, continue-watching and next-up rows and can start or resume titles on
+the Kodi box.
 
 ## Build
 
