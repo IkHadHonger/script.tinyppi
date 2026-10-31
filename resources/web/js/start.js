@@ -37,6 +37,8 @@ function applyStrings(strings, hello) {
     const name = names[button.dataset.tab] || "";
     button.setAttribute("aria-label", name);
     button.title = name;
+    const label = button.querySelector(".tablabel");
+    if (label) label.textContent = name;
   }
   $("themeHead").textContent = strings.theme_menu;
   $("tokenHead").textContent = strings.token_title;
@@ -85,9 +87,41 @@ function applyStrings(strings, hello) {
   $("vs10OutLabel").textContent = strings.output;
   if (hello) {
     if (hello.version) el.version.textContent = "v" + hello.version;
+    $("settingsServerName").textContent = hello.name || "TinyPPI";
+    $("settingsServerAddress").textContent = location.host;
+    $("settingsApiVersion").textContent = hello.version || "—";
+    $("settingsControl").textContent = hello.control ? "Toegestaan" : "Alleen lezen";
     offerShelves(hello);
   }
 }
+
+$("settingsServerAddress").textContent = location.host;
+$("settingsTestConnection").addEventListener("click", async () => {
+  const button = $("settingsTestConnection");
+  const result = $("settingsTestResult");
+  const badge = $("settingsConnectionBadge");
+  button.disabled = true;
+  button.textContent = "Verbinding testen…";
+  result.textContent = "";
+  try {
+    const hello = await TinyPPI.getJSON("/api/hello");
+    $("settingsServerName").textContent = hello.name || "TinyPPI";
+    $("settingsApiVersion").textContent = hello.version || "—";
+    $("settingsControl").textContent = hello.control ? "Toegestaan" : "Alleen lezen";
+    badge.classList.remove("failed");
+    badge.querySelector("span").textContent = "Verbonden";
+    result.className = "web-test-result success";
+    result.textContent = "Verbinding geslaagd";
+  } catch (_) {
+    badge.classList.add("failed");
+    badge.querySelector("span").textContent = "Niet verbonden";
+    result.className = "web-test-result failure";
+    result.textContent = "Verbinding mislukt";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Test verbinding";
+  }
+});
 
 /* The tab to open on: the one the address names, else the one this device
    was last left on, else what is playing. */

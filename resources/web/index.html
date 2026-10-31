@@ -254,23 +254,28 @@
        js/dashboard.js). -->
   <section class="tabpanel" id="tab-settings" data-tab="settings" role="tabpanel"
            aria-labelledby="tabbtn-settings">
+    <h1 class="settings-title">Instellingen</h1>
+    <section class="card web-connection-card">
+      <div class="web-connection-head">
+        <span class="web-server-icon" aria-hidden="true"></span>
+        <div class="web-connection-name">
+          <b id="settingsServerName">TinyPPI</b>
+          <span id="settingsServerAddress"></span>
+        </div>
+        <span class="web-connection-badge" id="settingsConnectionBadge"><i></i><span>Verbonden</span></span>
+      </div>
+      <div class="web-connection-facts">
+        <span><small>API</small><b id="settingsApiVersion">—</b></span>
+        <span><small>Bediening</small><b id="settingsControl">—</b></span>
+      </div>
+      <button class="setbtn web-test-connection" id="settingsTestConnection" type="button">Test verbinding</button>
+      <p class="web-test-result" id="settingsTestResult" role="status"></p>
+    </section>
+
+    <h2 class="settings-group-label">WEERGAVE</h2>
     <section class="card setcard">
       <h2 class="sethead" id="themeHead"></h2>
       <div class="setbody" id="themeSettings"></div>
-    </section>
-
-    <section class="card setcard">
-      <h2 class="sethead" id="tokenHead"></h2>
-      <div class="setbody">
-        <p class="setnote" id="tokenNote"></p>
-        <div class="setrow">
-          <span class="tokenshown mono" id="tokenShown">N/A</span>
-          <button class="setbtn" id="tokenBtn" type="button">
-            <span class="ui-icon painted icon-key"></span>
-            <span id="tokenBtnText"></span>
-          </button>
-        </div>
-      </div>
     </section>
 
     <!-- The chapter dots on the progress bar, this device's own choice (see
@@ -282,6 +287,21 @@
           <span id="chapterMarksText"></span>
           <input type="checkbox" id="chapterMarks" role="switch" checked>
         </label>
+      </div>
+    </section>
+
+    <h2 class="settings-group-label">SERVER EN DASHBOARD</h2>
+    <section class="card setcard">
+      <h2 class="sethead" id="tokenHead"></h2>
+      <div class="setbody">
+        <p class="setnote" id="tokenNote"></p>
+        <div class="setrow">
+          <span class="tokenshown mono" id="tokenShown">N/A</span>
+          <button class="setbtn" id="tokenBtn" type="button">
+            <span class="ui-icon painted icon-key"></span>
+            <span id="tokenBtnText"></span>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -302,6 +322,7 @@
       </div>
     </section>
 
+    <h2 class="settings-group-label">APP</h2>
     <section class="card setcard">
       <h2 class="sethead" id="reportHead"></h2>
       <div class="setbody setbtns">
@@ -319,35 +340,31 @@
 
 </main>
 
-<!-- The floating bar the tabs are switched with: the five places of the
-     app's bar, in its order, and the settings.  Icons only; each key says
-     what it is to a screen reader and under a pointer (see applyStrings in
-     js/start.js).  Over the page rather than under it: the panels
-     leave room at their foot for it (see .tabbar in css/base.css). -->
+<!-- The app bar, with the same order, icons and labels as TinyPPI iOS. -->
 <nav class="tabbar" id="tabBar" role="tablist" aria-label="TinyPPI">
   <button class="tab" id="tabbtn-live" type="button" role="tab" data-tab="live"
           aria-controls="tab-live">
-    <span class="tabicon"><span class="ui-icon painted icon-tab-live"></span></span>
-  </button>
-  <button class="tab" id="tabbtn-metadata" type="button" role="tab" data-tab="metadata"
-          aria-controls="tab-metadata">
-    <span class="tabicon"><span class="ui-icon painted icon-tab-metadata"></span></span>
+    <span class="tabicon"><span class="ui-icon painted icon-tab-live"></span><span class="tablabel"></span></span>
   </button>
   <button class="tab" id="tabbtn-films" type="button" role="tab" data-tab="films"
           aria-controls="tab-films">
-    <span class="tabicon"><span class="ui-icon painted icon-tab-films"></span></span>
+    <span class="tabicon"><span class="ui-icon painted icon-tab-films"></span><span class="tablabel"></span></span>
   </button>
   <button class="tab" id="tabbtn-series" type="button" role="tab" data-tab="series"
           aria-controls="tab-series">
-    <span class="tabicon"><span class="ui-icon painted icon-tab-series"></span></span>
+    <span class="tabicon"><span class="ui-icon painted icon-tab-series"></span><span class="tablabel"></span></span>
+  </button>
+  <button class="tab" id="tabbtn-metadata" type="button" role="tab" data-tab="metadata"
+          aria-controls="tab-metadata">
+    <span class="tabicon"><span class="ui-icon painted icon-tab-metadata"></span><span class="tablabel"></span></span>
   </button>
   <button class="tab" id="tabbtn-history" type="button" role="tab" data-tab="history"
           aria-controls="tab-history">
-    <span class="tabicon"><span class="ui-icon painted icon-tab-history"></span></span>
+    <span class="tabicon"><span class="ui-icon painted icon-tab-history"></span><span class="tablabel"></span></span>
   </button>
   <button class="tab" id="tabbtn-settings" type="button" role="tab" data-tab="settings"
           aria-controls="tab-settings">
-    <span class="tabicon"><span class="ui-icon painted icon-tab-settings"></span></span>
+    <span class="tabicon"><span class="ui-icon painted icon-tab-settings"></span><span class="tablabel"></span></span>
   </button>
 </nav>
 

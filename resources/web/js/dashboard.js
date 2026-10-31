@@ -144,7 +144,7 @@ TinyPPI.bindDisclosure(el.recentSeriesCard, "dashboard.recentseries", true);
 /* --- tabs --------------------------------------------------------------- */
 
 /* The places the bar switches between, in its order. */
-const TABS = ["live", "metadata", "films", "series", "history", "settings"];
+const TABS = ["live", "films", "series", "metadata", "history", "settings"];
 const TAB_KEY = "tinyppi.tab";
 
 let tab = null;            /* the tab in front                               */
