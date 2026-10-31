@@ -39,4 +39,41 @@
 .tinyppi-embedded #seasonsDialog { transition-property: opacity; }
 .tinyppi-embedded #detailsDialog.away,
 .tinyppi-embedded #seasonsDialog.away { transform: none; opacity: 0; }
-#dashboardBoxes { width: 100%; min-height: 85px; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+#dashboardBoxesCard .setbody { gap: 14px; }
+.dashboard-boxes-intro { margin: 0; color: var(--muted); line-height: 1.45; }
+.dashboard-boxes-label { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+.dashboard-boxes-label span { color: var(--muted); font-size: 13px; font-weight: 400; }
+#dashboardBoxes {
+  width: 100%; min-height: 104px; resize: vertical; box-sizing: border-box;
+  background: color-mix(in srgb, var(--bg) 82%, white 2%); color: var(--text);
+  border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+  font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+#dashboardBoxes:focus { outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 1px; }
+#dashboardBoxesSave { background: var(--accent); color: #101114; font-weight: 700; border-radius: 14px; }
+#dashboardBoxTokens { display: grid; gap: 10px; }
+.dashboard-box-item {
+  display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line);
+  border-radius: 16px; background: color-mix(in srgb, var(--bg) 72%, white 3%);
+}
+.dashboard-box-info { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; }
+.dashboard-box-icon {
+  width: 36px; height: 36px; border-radius: 11px; background: var(--tonal);
+  position: relative;
+}
+.dashboard-box-icon::before, .dashboard-box-icon::after {
+  content: ""; position: absolute; left: 9px; right: 9px; height: 6px;
+  border: 1.5px solid var(--on-tonal); border-radius: 2px;
+}
+.dashboard-box-icon::before { top: 9px; }
+.dashboard-box-icon::after { bottom: 9px; }
+.dashboard-box-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
+.dashboard-box-state { color: var(--muted); font-size: 12px; }
+.dashboard-box-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.dashboard-box-button { min-height: 40px; border-radius: 11px; font-size: 13px; }
+.dashboard-box-button.primary { background: var(--tonal); color: var(--on-tonal); }
+#dashboardBoxesStatus {
+  margin: 2px 0 0; padding: 13px 14px; border-radius: 13px;
+  background: color-mix(in srgb, var(--tonal) 45%, transparent);
+  color: var(--muted); font-size: 13px; line-height: 1.45;
+}

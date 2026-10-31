@@ -39,6 +39,74 @@ struct DashboardWebView: UIViewRepresentable {
         configuration.userContentController.addUserScript(
             WKUserScript(source: fanartScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
         )
+        let settingsPolishScript = """
+        (() => {
+          if (window.top !== window) return;
+          document.documentElement.classList.add('tinyppi-ios-app');
+          const style = document.createElement('style');
+          style.textContent = `
+            .tinyppi-ios-app #dashboardBoxesCard .sethead { font-size: 19px; padding-top: 18px; }
+            .tinyppi-ios-app #dashboardBoxesCard .setbody { gap: 14px; }
+            .tinyppi-ios-app #dashboardBoxesCard label { color: var(--muted); line-height: 1.4; }
+            .tinyppi-ios-app #dashboardBoxes { min-height: 108px; resize: vertical; border-radius: 14px; padding: 14px; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+            .tinyppi-ios-app #dashboardBoxesSave { border-radius: 14px; background: var(--accent); color: #101114; font-weight: 700; }
+            .tinyppi-ios-app #dashboardBoxTokens { display: grid; gap: 10px; }
+            .tinyppi-ios-app .ios-box-card { display: grid; gap: 11px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--bg) 72%, white 3%); }
+            .tinyppi-ios-app .ios-box-header { display: flex; align-items: center; gap: 10px; font-weight: 650; }
+            .tinyppi-ios-app .ios-box-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--tonal); color: var(--on-tonal); font-size: 17px; }
+            .tinyppi-ios-app .ios-box-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
+            .tinyppi-ios-app .ios-box-actions .setbtn { min-height: 40px; border-radius: 11px; padding: 0 12px; font-size: 13px; }
+            .tinyppi-ios-app #dashboardBoxesStatus { margin: 2px 0 0; padding: 13px 14px; border-radius: 13px; background: color-mix(in srgb, var(--tonal) 45%, transparent); color: var(--muted); font-size: 13px; line-height: 1.45; }
+          `;
+          document.head.append(style);
+
+          const polish = () => {
+            const card = document.getElementById('dashboardBoxesCard');
+            const tokenList = document.getElementById('dashboardBoxTokens');
+            if (!card || !tokenList) return;
+            const heading = card.querySelector('.sethead');
+            if (heading && heading.textContent !== 'Andere TinyPPI-boxen') heading.textContent = 'Andere TinyPPI-boxen';
+            const label = card.querySelector('label[for="dashboardBoxes"]');
+            if (label && label.textContent !== 'Serveradressen · één per regel') label.textContent = 'Serveradressen · één per regel';
+            const save = document.getElementById('dashboardBoxesSave');
+            if (save && save.textContent !== 'Boxen bewaren') save.textContent = 'Boxen bewaren';
+
+            for (const button of [...tokenList.querySelectorAll(':scope > button.setbtn')]) {
+              const parts = button.textContent.split(' · ');
+              const host = parts.shift() || 'TinyPPI-box';
+              let action = parts.join(' · ');
+              action = action.replace('Token invoeren in dit dashboard', 'Token instellen')
+                .replace('Bekijken via deze Cube', 'Via deze Cube bekijken')
+                .replace('Koppeltoken aanpassen', 'Koppeltoken wijzigen');
+              let group = [...tokenList.querySelectorAll('.ios-box-card')].find((item) => item.dataset.host === host);
+              if (!group) {
+                group = document.createElement('div');
+                group.className = 'ios-box-card';
+                group.dataset.host = host;
+                const header = document.createElement('div');
+                header.className = 'ios-box-header';
+                const icon = document.createElement('span');
+                icon.className = 'ios-box-icon';
+                icon.textContent = '▤';
+                const name = document.createElement('span');
+                name.textContent = host;
+                header.append(icon, name);
+                const actions = document.createElement('div');
+                actions.className = 'ios-box-actions';
+                group.append(header, actions);
+                tokenList.append(group);
+              }
+              button.textContent = action;
+              group.querySelector('.ios-box-actions').append(button);
+            }
+          };
+          polish();
+          new MutationObserver(polish).observe(document.documentElement, {childList: true, subtree: true});
+        })();
+        """
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: settingsPolishScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator

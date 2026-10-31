@@ -180,10 +180,26 @@
         updated: 0, attempted: Date.now(), playing: null, user: ''};
       boxes.push(box);
       if (address !== location.origin) {
+        const boxCard = document.createElement('div');
+        boxCard.className = 'dashboard-box-item';
+        const boxInfo = document.createElement('div');
+        boxInfo.className = 'dashboard-box-info';
+        const boxIcon = document.createElement('span');
+        boxIcon.className = 'dashboard-box-icon';
+        boxIcon.setAttribute('aria-hidden', 'true');
+        const boxName = document.createElement('span');
+        boxName.className = 'dashboard-box-name';
+        boxName.textContent = box.label;
+        const boxState = document.createElement('span');
+        boxState.className = 'dashboard-box-state';
+        boxState.textContent = 'Niet gekoppeld';
+        boxInfo.append(boxIcon, boxName, boxState);
+        const actions = document.createElement('div');
+        actions.className = 'dashboard-box-actions';
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'setbtn';
-        button.textContent = box.label + ' · Token invoeren in dit dashboard';
+        button.className = 'setbtn dashboard-box-button primary';
+        button.textContent = 'Token instellen';
         button.addEventListener('click', () => {
           box.authorizing = true;
           location.hash = 'live';
@@ -191,15 +207,17 @@
           box.frame.scrollIntoView({block: 'start'});
           box.frame.contentWindow.postMessage({type: 'tinyppi-ask-token'}, box.transportOrigin);
         });
-        tokens.append(button);
+        actions.append(button);
         if (/^http:\/\/100\./.test(address)) {
           const relayButton = document.createElement('button');
           relayButton.type = 'button';
-          relayButton.className = 'setbtn';
-          relayButton.textContent = box.label + (relayed ? ' · Koppeltoken aanpassen' : ' · Bekijken via deze Cube');
+          relayButton.className = 'setbtn dashboard-box-button';
+          relayButton.textContent = relayed ? 'Koppeltoken wijzigen' : 'Via deze Cube bekijken';
           relayButton.addEventListener('click', () => TinyPPI.configureRelay(address));
-          tokens.append(relayButton);
+          actions.append(relayButton);
         }
+        boxCard.append(boxInfo, actions);
+        tokens.append(boxCard);
       }
       row.append(frame);
     }

@@ -291,13 +291,14 @@
     </section>
 
     <section class="card setcard hidden" id="dashboardBoxesCard">
-      <h2 class="sethead">Gebruikers · andere TinyPPI-boxen</h2>
+      <h2 class="sethead">Andere TinyPPI-boxen</h2>
       <div class="setbody">
-        <label for="dashboardBoxes">Dashboard addresses, one per line (this box is included automatically)</label>
+        <p class="dashboard-boxes-intro">Beheer de boxen die in dit dashboard zichtbaar zijn. Deze box wordt automatisch toegevoegd.</p>
+        <label class="dashboard-boxes-label" for="dashboardBoxes">Serveradressen <span>één per regel</span></label>
         <textarea id="dashboardBoxes" placeholder="http://192.168.1.100:8099" spellcheck="false"></textarea>
-        <button class="setbtn" id="dashboardBoxesSave" type="button">Save boxes</button>
+        <button class="setbtn" id="dashboardBoxesSave" type="button">Boxen bewaren</button>
         <div id="dashboardBoxTokens"></div>
-        <p id="dashboardBoxesStatus" role="status">Alle boxen hebben TinyPPI 2.14.2 of nieuwer nodig. Stel op iedere andere box onder Dashboard → Trusted dashboard addresses het adres van dit hoofd-dashboard in. Klik hier eenmaal op Save boxes om de lijst te vertrouwen. Elke box houdt zijn eigen token en bediening; verbindingen lopen rechtstreeks vanuit deze browser.</p>
+        <p id="dashboardBoxesStatus" role="status">TinyPPI 2.14.2 of nieuwer is vereist. Stel op iedere andere box bij Dashboard → Vertrouwde dashboardadressen het adres van dit hoofddashboard in. Iedere box behoudt zijn eigen token en bediening.</p>
       </div>
     </section>
 
