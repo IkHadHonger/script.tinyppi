@@ -57,7 +57,7 @@ struct RootView: View {
 }
 
 private enum DashboardTab: String, CaseIterable, Identifiable {
-    case live, metadata, films, series, history, settings
+    case live, films, series, metadata, history, settings
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -90,11 +90,16 @@ private struct DashboardTabBar: View {
                     selection = tab
                 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: tab.icon).font(.system(size: 18, weight: .semibold))
-                        Text(tab.title).font(.system(size: 9, weight: .medium)).lineLimit(1)
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 26, height: 22, alignment: .center)
+                        Text(tab.title)
+                            .font(.system(size: 9, weight: .medium))
+                            .lineLimit(1)
+                            .frame(height: 12, alignment: .center)
                     }
                     .foregroundStyle(selection == tab ? Color.orange : Color.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .frame(maxWidth: .infinity, minHeight: 54, maxHeight: 54, alignment: .center)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

@@ -19,6 +19,26 @@ struct DashboardWebView: UIViewRepresentable {
         configuration.userContentController.addUserScript(
             WKUserScript(source: tokenScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
+        let fanartScript = """
+        (() => {
+          let lastTag = null;
+          const updateFanart = async () => {
+            try {
+              if (!window.TinyPPI || !window.TinyPPIHeroFanart) return;
+              const state = await TinyPPI.getJSON('/api/state');
+              const tag = state && state.playing && state.art ? (state.art.fanart || '') : '';
+              if (tag === lastTag) return;
+              lastTag = tag;
+              TinyPPIHeroFanart.show(document.getElementById('nowCard'), tag);
+            } catch (_) {}
+          };
+          updateFanart();
+          window.setInterval(updateFanart, 3000);
+        })();
+        """
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: fanartScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator

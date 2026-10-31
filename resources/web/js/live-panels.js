@@ -188,6 +188,7 @@
   let lastTry = 0;      /* when one was last attempted, failures included   */
   let range = HISTORY_SECONDS;
   let posterTag = "";
+  let fanartTag = "";
   let finishLabel = "";  /* "Ends at", once Kodi's table has been asked      */
   let lastFinish = "";   /* the clock that label belongs in front of         */
   let idleFetched = false;  /* the ended title's events, asked for once      */
@@ -884,6 +885,11 @@
      change long after the film did (see js/cover-tint.js). */
   function renderArt(art) {
     const tag = art.poster || "";
+    const fanart = art.fanart || "";
+    if (fanart !== fanartTag) {
+      fanartTag = fanart;
+      if (window.TinyPPIHeroFanart) TinyPPIHeroFanart.show(el.nowCard, fanart);
+    }
     if (tag === posterTag) return;
     posterTag = tag;
     if (!tag) {
@@ -1408,6 +1414,8 @@
         for (const node of cards) node.classList.add("hidden");
         live = [];
         posterTag = "";
+        fanartTag = "";
+        if (window.TinyPPIHeroFanart) TinyPPIHeroFanart.show(el.nowCard, "");
         renderFinish("");
         fpsShown = null;
         setFpsTrend(0);
