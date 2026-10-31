@@ -12,21 +12,9 @@ struct RootView: View {
                     .id(url.absoluteString + "|" + model.configuration.token)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        DashboardTabBar(selection: $selectedTab)
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        Button {
+                        DashboardTabBar(selection: $selectedTab) {
                             showServerSettings = true
-                        } label: {
-                            Image(systemName: "server.rack")
-                                .font(.system(size: 15, weight: .semibold))
-                                .frame(width: 34, height: 34)
-                                .background(.black.opacity(0.72), in: Circle())
-                                .foregroundStyle(.white)
                         }
-                        .accessibilityLabel("Serverinstellingen")
-                        .padding(.top, 8)
-                        .padding(.trailing, 12)
                     }
             } else {
                 NavigationStack { SettingsView() }
@@ -83,6 +71,7 @@ private enum DashboardTab: String, CaseIterable, Identifiable {
 
 private struct DashboardTabBar: View {
     @Binding var selection: DashboardTab
+    let openServerSettings: () -> Void
     var body: some View {
         HStack(spacing: 2) {
             ForEach(DashboardTab.allCases) { tab in
@@ -104,6 +93,13 @@ private struct DashboardTabBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
+                .contextMenu {
+                    if tab == .settings {
+                        Button(action: openServerSettings) {
+                            Label("Serververbinding", systemImage: "server.rack")
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 6)
