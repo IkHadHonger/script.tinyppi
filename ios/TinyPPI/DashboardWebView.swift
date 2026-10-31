@@ -37,7 +37,7 @@ struct DashboardWebView: UIViewRepresentable {
         })();
         """
         configuration.userContentController.addUserScript(
-            WKUserScript(source: fanartScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+            WKUserScript(source: fanartScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
         )
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
