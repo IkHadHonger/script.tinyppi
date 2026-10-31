@@ -41,7 +41,6 @@ final class AppModel: ObservableObject {
             save()
             isConnecting = false
             await refresh()
-            beginPolling(milliseconds: response.intervalMS)
         } catch {
             isConnecting = false
             errorMessage = error.localizedDescription

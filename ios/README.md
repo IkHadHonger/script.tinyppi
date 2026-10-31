@@ -14,6 +14,13 @@ the Live information cards and player commands. Its library tab reads films,
 series, continue-watching and next-up rows and can start or resume titles on
 the Kodi box.
 
+From 1.2 onward the installed app presents the canonical dashboard served by
+the connected TinyPPI 2.22.0 box in a native `WKWebView`. That gives the iOS
+app the same interface and feature set as the web app (Live, metadata, films,
+series, history, remote controls, filters, details and dashboard settings),
+while the native server sheet keeps host, port and token configuration on the
+device.
+
 ## Build
 
 The Xcode project is generated from `project.yml`:
