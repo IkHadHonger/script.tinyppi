@@ -63,7 +63,7 @@ struct DashboardWebView: UIViewRepresentable {
     private func load(_ webView: WKWebView) {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
         components?.path = "/"
-        components?.queryItems = [URLQueryItem(name: "embedded", value: "1")]
+        components?.queryItems = nil
         components?.fragment = selectedTab
         guard let url = components?.url else { return }
         webView.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 15))
