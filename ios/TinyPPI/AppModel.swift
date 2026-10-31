@@ -104,6 +104,17 @@ final class AppModel: ObservableObject {
         state = nil
     }
 
+    func updateConfiguration(_ configuration: ServerConfiguration) {
+        self.configuration = configuration
+        save()
+    }
+
+    func removeConfiguration() {
+        disconnect()
+        configuration = ServerConfiguration()
+        save()
+    }
+
     private func beginPolling(milliseconds: Int) {
         let delay = UInt64(max(milliseconds, 750)) * 1_000_000
         pollingTask = Task { [weak self] in
