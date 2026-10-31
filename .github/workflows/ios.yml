@@ -1,0 +1,56 @@
+name: TinyPPI iOS
+
+on:
+  push:
+    branches: [main]
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    name: Simulator build and tests
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build
+        run: xcodebuild -project TinyPPI.xcodeproj -scheme TinyPPI -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_ALLOWED=NO build
+      - name: Test
+        run: xcodebuild -project TinyPPI.xcodeproj -scheme TinyPPI -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_ALLOWED=NO test
+
+  sidestore-ipa:
+    name: Unsigned SideStore IPA
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build unsigned device app
+        run: xcodebuild -project TinyPPI.xcodeproj -scheme TinyPPI -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/TinyPPI.app Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload TinyPPI-1.0-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TinyPPI-1.0-SideStore
+          path: ios/TinyPPI-1.0-unsigned.ipa
+          if-no-files-found: error
+
