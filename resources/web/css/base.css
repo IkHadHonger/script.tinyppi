@@ -67,7 +67,7 @@
   --gap:       17px;
   /* What the foot of the page leaves for the floating tab bar: the bar's own
      height, the air under it and the air between it and the last card. */
-  --tabbar-room: 96px;
+  --tabbar-room: 64px;
   /* The page's own face, named so a reading set in the monospaced one can put
      its label back into it without repeating the stack (see .times > .finish
      in live-panels.css). */
@@ -460,23 +460,22 @@ main {
    wall of posters somebody has scrolled. */
 .tabbar {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 30px;
+  right: 30px;
   bottom: 0;
   z-index: 30;
   display: flex;
   gap: 0;
-  width: 100%;
-  min-height: calc(72px + env(safe-area-inset-bottom));
-  align-items: flex-start;
-  padding: 8px 6px env(safe-area-inset-bottom);
-  border-radius: 0;
-  border: 0;
-  border-top: 1px solid var(--line);
+  width: auto;
+  min-height: 50px;
+  align-items: center;
+  padding: 2px 5px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel-3) 86%, transparent);
   backdrop-filter: blur(18px) saturate(1.3);
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
-  box-shadow: var(--shadow-lift);
+  box-shadow: 0 9px 24px rgba(0, 0, 0, .28);
   will-change: transform, opacity;
   transition:
     transform .52s cubic-bezier(.22, 1, .36, 1),
@@ -513,12 +512,12 @@ main {
   justify-content: center;
   gap: 3px;
   width: 100%;
-  height: 54px;
+  height: 46px;
   border-radius: 12px;
   transition: color .2s, background .2s;
 }
-.tabicon .ui-icon { width: 22px; height: 22px; }
-.tablabel { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 10px; font-weight: 550; line-height: 13px; white-space: nowrap; }
+.tabicon .ui-icon { width: 18px; height: 18px; }
+.tablabel { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 550; line-height: 11px; white-space: nowrap; }
 .tab.on { color: var(--warn); }
 .tab.on .tabicon {
   width: 100%;
@@ -537,6 +536,7 @@ main {
    Keep the same controls in a compact floating dock near the content instead;
    touch-sized and full-width remains the better shape on narrow screens. */
 @media (min-width: 900px) and (hover: hover) {
+  :root { --tabbar-room: 96px; }
   .tabbar {
     left: 50%;
     right: auto;
@@ -553,6 +553,7 @@ main {
   }
   .tab { padding: 0 3px; }
   .tabicon { height: 50px; border-radius: 13px; }
+  .tabicon .ui-icon { width: 22px; height: 22px; }
   .tablabel { font-size: 11px; }
 }
 

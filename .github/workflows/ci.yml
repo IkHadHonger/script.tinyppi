@@ -98,7 +98,7 @@ jobs:
         run: zip -r "$RUNNER_TEMP/script.tinyppi-2.22.2.zip" script.tinyppi
       - uses: actions/upload-artifact@v4
         with:
-          name: TinyPPI-2.22.8-Kodi
+          name: TinyPPI-2.22.9-Kodi
           path: ${{ runner.temp }}/script.tinyppi-2.22.2.zip
           if-no-files-found: error
 
