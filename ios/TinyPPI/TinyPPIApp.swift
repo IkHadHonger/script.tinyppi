@@ -8,6 +8,7 @@ struct TinyPPIApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(model)
+                .preferredColorScheme(.dark)
                 .task { await model.start() }
         }
     }

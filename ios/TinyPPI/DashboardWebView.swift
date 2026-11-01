@@ -55,6 +55,7 @@ struct DashboardWebView: UIViewRepresentable {
           document.documentElement.classList.add('tinyppi-ios-app');
           const style = document.createElement('style');
           style.textContent = `
+            .tinyppi-ios-app #tabBar { display: none !important; }
             .tinyppi-ios-app #dashboardBoxesCard .sethead { font-size: 19px; padding-top: 18px; }
             .tinyppi-ios-app #dashboardBoxesCard .setbody { gap: 14px; }
             .tinyppi-ios-app #dashboardBoxesCard label { color: var(--muted); line-height: 1.4; }

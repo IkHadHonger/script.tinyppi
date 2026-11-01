@@ -114,7 +114,7 @@ private struct DashboardTabBar: View {
             }
         }
         .padding(.horizontal, 6)
-        .background(.ultraThinMaterial)
+        .background(Color(red: 0.105, green: 0.125, blue: 0.14))
         .overlay(alignment: .top) { Divider() }
     }
 }
