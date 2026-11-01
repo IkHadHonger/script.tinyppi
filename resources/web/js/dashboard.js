@@ -304,7 +304,8 @@ window.addEventListener("hashchange", () => {
    back, and the end of the page never leaves somebody stranded without it.
    Details own the whole screen and therefore keep it away. */
 let lastBarScrollY = Math.max(0, window.scrollY);
-let barLeftAt = 0;         /* ignore the layout scroll caused by leaving    */
+let lastKeyboardAt = -Infinity;
+let lastTouchY = null;
 
 function detailsAreOpen() {
   return !!document.querySelector("dialog[open]");
@@ -315,13 +316,15 @@ function wakeBar() {
   document.documentElement.classList.remove("bar-away");
 }
 
-function hideBar() {
-  if (el.tabBar.matches(":hover, :focus-within")) return;
+function hideBar(force = false) {
+  if (!force && Date.now() - lastKeyboardAt < 700) return;
   document.documentElement.classList.add("bar-away");
-  barLeftAt = Date.now();
 }
 
-document.addEventListener("keydown", wakeBar, { capture: true, passive: true });
+document.addEventListener("keydown", () => {
+  lastKeyboardAt = Date.now();
+  wakeBar();
+}, { capture: true, passive: true });
 document.addEventListener("focusin", (event) => {
   if (el.tabBar.contains(event.target)) wakeBar();
 }, { capture: true, passive: true });
@@ -330,7 +333,20 @@ document.addEventListener("pointermove", (event) => {
 }, { capture: true, passive: true });
 document.addEventListener("wheel", (event) => {
   if (event.deltaY < 0) wakeBar();
+  else if (event.deltaY > 0) hideBar(true);
 }, { capture: true, passive: true });
+document.addEventListener("touchstart", (event) => {
+  lastTouchY = event.touches[0]?.clientY ?? null;
+}, { capture: true, passive: true });
+document.addEventListener("touchmove", (event) => {
+  const y = event.touches[0]?.clientY;
+  if (y == null || lastTouchY == null) return;
+  if (y < lastTouchY) hideBar(true);
+  else if (y > lastTouchY) wakeBar();
+  lastTouchY = y;
+}, { capture: true, passive: true });
+document.addEventListener("touchend", () => { lastTouchY = null; },
+  { capture: true, passive: true });
 
 function atPageEnd() {
   const height = document.documentElement.scrollHeight;
@@ -344,13 +360,13 @@ window.addEventListener("scroll", () => {
   lastBarScrollY = now;
   if (atPageEnd() || moved < 0) {
     wakeBar();
-  } else if (moved > 0 && Date.now() - barLeftAt > 600) {
+  } else if (moved > 0) {
     hideBar();
   }
 }, { passive: true });
 
 const dialogBarObserver = new MutationObserver(() => {
-  if (detailsAreOpen()) hideBar();
+  if (detailsAreOpen()) hideBar(true);
   else wakeBar();
 });
 for (const dialog of document.querySelectorAll("dialog")) {

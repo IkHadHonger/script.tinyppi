@@ -365,7 +365,7 @@ test("the bar stays while idle, hides on the first downward scroll and returns u
   assert.equal(away(), false, "a small upward move restores navigation");
 });
 
-test("details hide the bar, closing them restores it, and focused navigation stays", async (t) => {
+test("details hide the bar and real keyboard navigation stays available", async (t) => {
   const { window, $ } = open(t);
   const doc = window.document;
   const away = () => doc.documentElement.classList.contains("bar-away");
@@ -379,9 +379,10 @@ test("details hide the bar, closing them restores it, and focused navigation sta
   Object.defineProperty(window, "scrollY", { configurable: true, writable: true, value: 0 });
   Object.defineProperty(doc.documentElement, "scrollHeight", { configurable: true, value: 2000 });
   $("tabbtn-live").focus();
+  doc.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab" }));
   window.scrollY = 120;
   window.dispatchEvent(new window.Event("scroll"));
-  assert.equal(away(), false, "a focused key remains available");
+  assert.equal(away(), false, "recent keyboard navigation remains available");
 });
 
 test("the page end, upward wheel and desktop bottom edge restore hidden navigation", (t) => {
@@ -405,6 +406,8 @@ test("the page end, upward wheel and desktop bottom edge restore hidden navigati
   assert.equal(away(), true);
   doc.dispatchEvent(new window.WheelEvent("wheel", { deltaY: -1 }));
   assert.equal(away(), false, "an upward wheel restores it immediately");
+  doc.dispatchEvent(new window.WheelEvent("wheel", { deltaY: 1 }));
+  assert.equal(away(), true, "a downward wheel hides it even before scrolling");
   scroll(1000);
   clock.tick(601);
   scroll(1100);
