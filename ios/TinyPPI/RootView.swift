@@ -24,7 +24,7 @@ struct RootView: View {
                         DashboardTabBar(selection: $selectedTab) {
                             showServerSettings = true
                         }
-                        .padding(.horizontal, 18)
+                        .padding(.horizontal, 30)
                         .offset(y: detailIsOpen || tabBarIsHidden ? 120 : 10)
                         .opacity(detailIsOpen || tabBarIsHidden ? 0 : 1)
                         .allowsHitTesting(!detailIsOpen && !tabBarIsHidden)
