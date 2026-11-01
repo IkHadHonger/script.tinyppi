@@ -67,7 +67,7 @@
   --gap:       17px;
   /* What the foot of the page leaves for the floating tab bar: the bar's own
      height, the air under it and the air between it and the last card. */
-  --tabbar-room: 64px;
+  --tabbar-room: 78px;
   /* The page's own face, named so a reading set in the monospaced one can put
      its label back into it without repeating the stack (see .times > .finish
      in live-panels.css). */
@@ -462,7 +462,7 @@ main {
   position: fixed;
   left: 30px;
   right: 30px;
-  bottom: 8px;
+  bottom: 22px;
   z-index: 30;
   display: flex;
   gap: 0;
@@ -483,7 +483,7 @@ main {
 }
 /* Away: slid off the foot of the screen and faded, and nothing to press. */
 :root.bar-away .tabbar {
-  transform: translateY(calc(100% + 10px));
+  transform: translateY(calc(100% + 24px));
   opacity: 0;
   pointer-events: none;
 }
