@@ -462,7 +462,7 @@ main {
   position: fixed;
   left: 30px;
   right: 30px;
-  bottom: 0;
+  bottom: 8px;
   z-index: 30;
   display: flex;
   gap: 0;
@@ -483,7 +483,7 @@ main {
 }
 /* Away: slid off the foot of the screen and faded, and nothing to press. */
 :root.bar-away .tabbar {
-  transform: translateY(100%);
+  transform: translateY(calc(100% + 10px));
   opacity: 0;
   pointer-events: none;
 }
