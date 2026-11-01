@@ -177,6 +177,7 @@ struct DashboardWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
+        webView.alpha = 0
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         load(webView)
@@ -225,19 +226,32 @@ struct DashboardWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            selectTab(in: webView)
+            selectTab(in: webView, revealAfterSelection: true)
         }
 
-        func selectTab(in webView: WKWebView) {
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            webView.alpha = 0
+        }
+
+        func selectTab(in webView: WKWebView, revealAfterSelection: Bool = false) {
             let safeTab = selectedTab.replacingOccurrences(of: "'", with: "")
             let script = """
             (() => {
-              document.getElementById('tabBar')?.classList.add('hidden');
+              const tabBar = document.getElementById('tabBar');
+              if (tabBar) {
+                tabBar.classList.add('hidden');
+                tabBar.style.setProperty('display', 'none', 'important');
+              }
               document.getElementById('tabbtn-\(safeTab)')?.click();
               window.scrollTo(0, 0);
             })();
             """
-            webView.evaluateJavaScript(script)
+            webView.evaluateJavaScript(script) { _, _ in
+                guard revealAfterSelection else { return }
+                DispatchQueue.main.async {
+                    UIView.animate(withDuration: 0.12) { webView.alpha = 1 }
+                }
+            }
         }
 
         func webView(
