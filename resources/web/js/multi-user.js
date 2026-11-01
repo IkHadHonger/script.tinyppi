@@ -49,10 +49,11 @@
     document.documentElement.classList.add('tinyppi-embedded');
     const main = document.querySelector('main');
     const navigation = document.getElementById('tabBar');
-    main.before(navigation);
+    const topbar = document.querySelector('.topbar');
+    topbar.append(navigation);
     const userHeading = document.createElement('b');
     userHeading.className = 'embedded-user';
-    document.querySelector('.topbar').prepend(userHeading);
+    topbar.prepend(userHeading);
     const tokenButton = document.createElement('button');
     tokenButton.type = 'button';
     tokenButton.className = 'setbtn';
