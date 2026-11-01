@@ -533,6 +533,29 @@ main { transition: padding-bottom .3s ease; }
 .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (max-width: 390px) { .tablabel { font-size: 9px; } }
 
+/* A desktop has no need for a phone bar stretched across the full monitor.
+   Keep the same controls in a compact floating dock near the content instead;
+   touch-sized and full-width remains the better shape on narrow screens. */
+@media (min-width: 900px) and (hover: hover) {
+  .tabbar {
+    left: 50%;
+    right: auto;
+    bottom: 18px;
+    width: min(700px, calc(100% - 48px));
+    min-height: 64px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    transform: translateX(-50%);
+  }
+  :root.bar-away .tabbar {
+    transform: translate(-50%, calc(100% + 24px));
+  }
+  .tab { padding: 0 3px; }
+  .tabicon { height: 50px; border-radius: 13px; }
+  .tablabel { font-size: 11px; }
+}
+
 /* --- Settings ------------------------------------------------------------ */
 
 /* What used to hide behind the key in the top bar, one card per thing: the
