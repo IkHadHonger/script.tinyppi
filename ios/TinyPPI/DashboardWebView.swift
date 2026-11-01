@@ -253,7 +253,7 @@ struct DashboardWebView: UIViewRepresentable {
             lastScrollY = y
             guard !detailIsOpen else { return }
             let isAtBottom = y + scrollView.bounds.height >= scrollView.contentSize.height - 2
-            if isAtBottom || delta < -2 {
+            if isAtBottom || delta < -0.5 {
                 setTabBarHidden(false)
             } else if delta > 0.5 {
                 setTabBarHidden(true)

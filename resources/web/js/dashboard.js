@@ -342,7 +342,7 @@ window.addEventListener("scroll", () => {
   const now = Math.max(0, window.scrollY);
   const moved = now - lastBarScrollY;
   lastBarScrollY = now;
-  if (atPageEnd() || moved < -3) {
+  if (atPageEnd() || moved < 0) {
     wakeBar();
   } else if (moved > 0 && Date.now() - barLeftAt > 600) {
     hideBar();
