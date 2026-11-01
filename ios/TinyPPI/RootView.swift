@@ -26,6 +26,10 @@ struct RootView: View {
                         }
                     }
                     .animation(.easeInOut(duration: 0.2), value: detailIsOpen)
+                    .ignoresSafeArea(
+                        .container,
+                        edges: detailIsOpen ? .bottom : Edge.Set()
+                    )
             } else {
                 NavigationStack { SettingsView() }
             }
