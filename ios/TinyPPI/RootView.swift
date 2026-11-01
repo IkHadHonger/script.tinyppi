@@ -25,7 +25,7 @@ struct RootView: View {
                             showServerSettings = true
                         }
                         .padding(.horizontal, 18)
-                        .offset(y: detailIsOpen || tabBarIsHidden ? 110 : 0)
+                        .offset(y: detailIsOpen || tabBarIsHidden ? 120 : 10)
                         .opacity(detailIsOpen || tabBarIsHidden ? 0 : 1)
                         .allowsHitTesting(!detailIsOpen && !tabBarIsHidden)
                     }
