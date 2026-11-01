@@ -180,16 +180,18 @@ struct DashboardWebView: UIViewRepresentable {
         webView.alpha = 0
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        load(webView)
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.selectedTab = selectedTab
         context.coordinator.onDetailVisibilityChanged = onDetailVisibilityChanged
-        if webView.url?.host != baseURL.host || webView.url?.port != baseURL.port {
+        if !context.coordinator.hasRequestedInitialLoad
+            || webView.url?.host != baseURL.host
+            || webView.url?.port != baseURL.port {
+            context.coordinator.hasRequestedInitialLoad = true
             load(webView)
-        } else {
+        } else if webView.url != nil {
             context.coordinator.selectTab(in: webView)
         }
     }
@@ -207,6 +209,7 @@ struct DashboardWebView: UIViewRepresentable {
         static let detailVisibilityMessage = "tinyppiDetailVisibility"
         var selectedTab: String
         var onDetailVisibilityChanged: (Bool) -> Void
+        var hasRequestedInitialLoad = false
         private var detailIsOpen = false
 
         init(selectedTab: String, onDetailVisibilityChanged: @escaping (Bool) -> Void) {
