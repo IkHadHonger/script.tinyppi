@@ -6,8 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    CURRENT_PROJECT_VERSION: 24
-    MARKETING_VERSION: 1.6.2
+    CURRENT_PROJECT_VERSION: 25
+    MARKETING_VERSION: 1.6.3
     DEVELOPMENT_TEAM: ""
 targets:
   TinyPPI:

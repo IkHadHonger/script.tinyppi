@@ -24,6 +24,8 @@ struct RootView: View {
                         DashboardTabBar(selection: $selectedTab) {
                             showServerSettings = true
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 4)
                         .offset(y: detailIsOpen || tabBarIsHidden ? 110 : 0)
                         .opacity(detailIsOpen || tabBarIsHidden ? 0 : 1)
                         .allowsHitTesting(!detailIsOpen && !tabBarIsHidden)
@@ -98,24 +100,30 @@ private struct DashboardTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 26, height: 22, alignment: .center)
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 24, height: 20, alignment: .center)
                         Text(tab.title)
                             .font(.system(size: 9, weight: .medium))
                             .lineLimit(1)
-                            .frame(height: 12, alignment: .center)
+                            .frame(height: 11, alignment: .center)
                     }
                     .foregroundStyle(selection == tab ? Color.orange : Color.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 54, maxHeight: 54, alignment: .center)
+                    .frame(maxWidth: .infinity, minHeight: 50, maxHeight: 50, alignment: .center)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 3)
         .background(Color(red: 0.105, green: 0.125, blue: 0.14))
-        .overlay(alignment: .top) { Divider() }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.09), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
     }
 }
 
