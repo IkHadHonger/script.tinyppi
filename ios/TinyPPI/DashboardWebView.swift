@@ -39,12 +39,20 @@ struct DashboardWebView: UIViewRepresentable {
             }
             return true;
           };
-          if (!install()) {
-            const observer = new MutationObserver(() => {
-              if (install()) observer.disconnect();
-            });
-            observer.observe(document, {childList: true, subtree: true});
-          }
+          const hideEmbeddedTabs = () => {
+            const tabBar = document.getElementById('tabBar');
+            if (!tabBar) return false;
+            tabBar.classList.add('hidden');
+            tabBar.style.setProperty('display', 'none', 'important');
+            return true;
+          };
+          install();
+          const observer = new MutationObserver(() => {
+            install();
+            if (hideEmbeddedTabs()) observer.disconnect();
+          });
+          observer.observe(document, {childList: true, subtree: true});
+          if (hideEmbeddedTabs()) observer.disconnect();
         })();
         """
         configuration.userContentController.addUserScript(
@@ -177,7 +185,6 @@ struct DashboardWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
-        webView.alpha = 0
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         return webView
@@ -229,14 +236,10 @@ struct DashboardWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            selectTab(in: webView, revealAfterSelection: true)
+            selectTab(in: webView)
         }
 
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            webView.alpha = 0
-        }
-
-        func selectTab(in webView: WKWebView, revealAfterSelection: Bool = false) {
+        func selectTab(in webView: WKWebView) {
             let safeTab = selectedTab.replacingOccurrences(of: "'", with: "")
             let script = """
             (() => {
@@ -249,12 +252,7 @@ struct DashboardWebView: UIViewRepresentable {
               window.scrollTo(0, 0);
             })();
             """
-            webView.evaluateJavaScript(script) { _, _ in
-                guard revealAfterSelection else { return }
-                DispatchQueue.main.async {
-                    UIView.animate(withDuration: 0.12) { webView.alpha = 1 }
-                }
-            }
+            webView.evaluateJavaScript(script)
         }
 
         func webView(
