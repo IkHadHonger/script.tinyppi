@@ -347,61 +347,74 @@ test("a browser that blocks storage and address writes still switches tabs", (t)
 
 /* --- the bar's comings and goings ------------------------------------- */
 
-test("the bar steps away after three quiet seconds, and any activity brings it back", (t) => {
+test("the bar stays while idle, hides after a deliberate downward scroll and returns upward", (t) => {
   const { window, clock } = open(t);
   const away = () => window.document.documentElement.classList.contains("bar-away");
-  clock.tick(2999);
-  assert.equal(away(), false);
-  clock.tick(1);
+  Object.defineProperty(window, "scrollY", { configurable: true, writable: true, value: 0 });
+  Object.defineProperty(window.document.documentElement, "scrollHeight",
+    { configurable: true, value: 2000 });
+  const scroll = (to) => {
+    window.scrollY = to;
+    window.dispatchEvent(new window.Event("scroll"));
+  };
+  clock.tick(9000);
+  assert.equal(away(), false, "time alone does not hide navigation");
+  scroll(50);
+  assert.equal(away(), false, "a small downward move is ignored");
+  scroll(95);
+  assert.equal(away(), false, "the threshold has not been crossed");
+  scroll(100);
   assert.equal(away(), true);
-  for (const kind of ["pointermove", "wheel", "keydown", "touchmove"]) {
-    window.document.dispatchEvent(new window.Event(kind));
-    assert.equal(away(), false, kind);
-    clock.tick(3000);
-    assert.equal(away(), true, kind);
-  }
+  scroll(95);
+  assert.equal(away(), false, "a small upward move restores navigation");
 });
 
-test("the bar stays while a finger is down, a dialog is open or one of its keys has the focus", (t) => {
-  const { window, $, clock } = open(t);
+test("details hide the bar, closing them restores it, and focused navigation stays", async (t) => {
+  const { window, $ } = open(t);
   const doc = window.document;
   const away = () => doc.documentElement.classList.contains("bar-away");
-  doc.dispatchEvent(new window.Event("pointerdown"));
-  clock.tick(9000);
-  assert.equal(away(), false, "a finger is still down");
-  doc.dispatchEvent(new window.Event("pointerup"));
-  clock.tick(3000);
-  assert.equal(away(), true);
-
-  doc.dispatchEvent(new window.Event("pointerdown"));
-  doc.dispatchEvent(new window.Event("pointercancel"));
   $("detailsDialog").showModal();
-  clock.tick(9000);
-  assert.equal(away(), false, "a dialog is open");
+  await settle();
+  assert.equal(away(), true, "details own the screen");
   $("detailsDialog").close();
-  clock.tick(3000);
-  assert.equal(away(), true);
+  await settle();
+  assert.equal(away(), false);
 
-  doc.dispatchEvent(new window.Event("pointermove"));
+  Object.defineProperty(window, "scrollY", { configurable: true, writable: true, value: 0 });
+  Object.defineProperty(doc.documentElement, "scrollHeight", { configurable: true, value: 2000 });
   $("tabbtn-live").focus();
-  clock.tick(9000);
-  assert.equal(away(), false, "a key has the focus");
-  $("tabbtn-live").blur();
-  clock.tick(3000);
-  assert.equal(away(), true);
+  window.scrollY = 120;
+  window.dispatchEvent(new window.Event("scroll"));
+  assert.equal(away(), false, "a focused key remains available");
 });
 
-test("a scroll brings the bar back, but not the browser's own scroll as it leaves", (t) => {
+test("the page end, upward wheel and desktop bottom edge restore hidden navigation", (t) => {
   const { window, clock } = open(t);
-  const away = () => window.document.documentElement.classList.contains("bar-away");
-  clock.tick(3000);
+  const doc = window.document;
+  const away = () => doc.documentElement.classList.contains("bar-away");
+  Object.defineProperty(window, "scrollY", { configurable: true, writable: true, value: 0 });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
+  Object.defineProperty(doc.documentElement, "scrollHeight", { configurable: true, value: 2000 });
+  const scroll = (to) => {
+    window.scrollY = to;
+    window.dispatchEvent(new window.Event("scroll"));
+  };
+  scroll(100);
   assert.equal(away(), true);
-  clock.tick(600);
-  window.dispatchEvent(new window.Event("scroll"));
+  scroll(1300);
+  assert.equal(away(), false, "the end of the page restores it");
+  scroll(1100);
+  clock.tick(601);
+  scroll(1200);
   assert.equal(away(), true);
-  clock.tick(1);
-  window.dispatchEvent(new window.Event("scroll"));
-  assert.equal(away(), false);
+  doc.dispatchEvent(new window.WheelEvent("wheel", { deltaY: -1 }));
+  assert.equal(away(), false, "an upward wheel restores it immediately");
+  scroll(1000);
+  clock.tick(601);
+  scroll(1100);
+  assert.equal(away(), true);
+  doc.dispatchEvent(new window.MouseEvent("pointermove", { clientY: 699 }));
+  assert.equal(away(), false, "the desktop bottom edge restores it");
 });
 
 /* --- settings --------------------------------------------------------- */
