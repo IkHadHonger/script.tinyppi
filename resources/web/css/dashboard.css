@@ -379,6 +379,34 @@
   grid-template-columns: repeat(auto-fill, minmax(min(124px, 44%), 1fr));
   gap: 12px;
 }
+
+/* Poster-shaped placeholders while a shelf crosses the local network.  They
+   occupy the final tile geometry, so the page does not jump when the answer
+   arrives.  One soft highlight moves through the neutral surfaces; no spinner
+   competes with the artwork or suggests that playback itself is busy. */
+.library-skeleton { display: grid; gap: 8px; min-width: 0; }
+.library-skeleton-poster,
+.library-skeleton-line {
+  display: block;
+  overflow: hidden;
+  background: linear-gradient(100deg, var(--panel-2) 20%, var(--panel-3) 42%, var(--panel-2) 64%) 0 0 / 220% 100%;
+  animation: library-shimmer 1.45s ease-in-out infinite;
+}
+.library-skeleton-poster {
+  aspect-ratio: 2 / 3;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+}
+.library-skeleton-line { height: 12px; border-radius: 999px; }
+.library-skeleton-line.title { width: 82%; }
+.library-skeleton-line.meta { width: 45%; height: 10px; }
+@keyframes library-shimmer {
+  from { background-position: 110% 0; }
+  to { background-position: -110% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .library-skeleton-poster, .library-skeleton-line { animation: none; background: var(--panel-2); }
+}
 /* Three to a row on a phone, as the app's wall has: two posters across a
    phone is a wall that takes half again as long to scroll past. */
 @media (max-width: 620px) {

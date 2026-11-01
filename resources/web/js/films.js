@@ -10,7 +10,7 @@
    of js/dashboard.js and its other parts (see index.html for the order).
    What it uses from them and what it gives them is listed below. */
 
-/* global bindTitle, continueStale, el, selectTab, shelfTools, T */
+/* global bindTitle, continueStale, el, selectTab, shelfTools, T, TinyPPILibraryLoading */
 /* exported FILMS_RETRY_MS, FILMS_START_MS, filmQuestion, filmTools, filmsOffered, filmsStale,
    hideFilms, metaLine, newest, ratingBadge, releaseFilms, releasing,
    requestFilms, runtime, starting */
@@ -80,6 +80,11 @@ function requestFilms(force) {
   if (!force && filmsRead) return;
   if (Date.now() < filmsNextTry) return;
   filmsBusy = true;
+  if (!filmsShown) {
+    TinyPPILibraryLoading.showCard(el.recentFilmsCard, el.recentFilmsRow, 5);
+    TinyPPILibraryLoading.showCard(el.unseenFilmsCard, el.unseenFilmGrid, 5);
+    TinyPPILibraryLoading.showCard(el.filmsCard, el.filmGrid, 9);
+  }
   loadFilms().finally(() => { filmsBusy = false; });
 }
 
@@ -97,6 +102,9 @@ async function loadFilms() {
     }
     filmsShown = true;
     filmsNextTry = 0;
+    TinyPPILibraryLoading.clear(el.recentFilmsRow);
+    TinyPPILibraryLoading.clear(el.unseenFilmGrid);
+    TinyPPILibraryLoading.clear(el.filmGrid);
     const list = Array.isArray(answer.movies) ? answer.movies : [];
     /* The tag changes only when the library does, so a list that has not
        moved leaves the wall -- and anything the search box is holding -- as
@@ -113,6 +121,9 @@ async function loadFilms() {
     el.unseenFilmsCard.classList.toggle("hidden",
                                         !el.unseenFilmGrid.children.length);
   } catch (error) {
+    TinyPPILibraryLoading.clear(el.recentFilmsRow);
+    TinyPPILibraryLoading.clear(el.unseenFilmGrid);
+    TinyPPILibraryLoading.clear(el.filmGrid);
     filmsRead = false;
     filmsNextTry = Date.now() + FILMS_RETRY_MS;
     /* 403: there is no library on offer -- switched off in the add-on's

@@ -11,7 +11,7 @@
    What it uses from them and what it gives them is listed below. */
 
 /* global selectTab, showDetails, slideIn, tintDialog, bindTitle, continueStale, el, FILMS_RETRY_MS, FILMS_START_MS, newest,
-   ratingBadge, runtime, shelfTools, T */
+   ratingBadge, runtime, shelfTools, T, TinyPPILibraryLoading, waitingForDetails */
 /* exported openShowDetails, showQuestion, episodeCode, episodeReleasing, hideSeries, refreshEpisodes,
    releaseSeries, requestSeries, seriesOffered, seriesStale, seriesTools,
    startingEpisode */
@@ -69,6 +69,11 @@ function requestSeries(force) {
   if (!force && seriesRead) return;
   if (Date.now() < seriesNextTry) return;
   seriesBusy = true;
+  if (!seriesShown) {
+    TinyPPILibraryLoading.showCard(el.recentSeriesCard, el.recentSeriesRow, 5);
+    TinyPPILibraryLoading.showCard(el.unseenSeriesCard, el.unseenSeriesGrid, 5);
+    TinyPPILibraryLoading.showCard(el.seriesCard, el.seriesGrid, 9);
+  }
   loadSeries().finally(() => { seriesBusy = false; });
 }
 
@@ -86,6 +91,9 @@ async function loadSeries() {
     }
     seriesShown = true;
     seriesNextTry = 0;
+    TinyPPILibraryLoading.clear(el.recentSeriesRow);
+    TinyPPILibraryLoading.clear(el.unseenSeriesGrid);
+    TinyPPILibraryLoading.clear(el.seriesGrid);
     const list = Array.isArray(answer.shows) ? answer.shows : [];
     if (!el.seriesGrid.children.length || (answer.tag || "") !== seriesTag) {
       seriesTag = answer.tag || "";
@@ -99,6 +107,9 @@ async function loadSeries() {
     el.unseenSeriesCard.classList.toggle("hidden",
                                          !el.unseenSeriesGrid.children.length);
   } catch (error) {
+    TinyPPILibraryLoading.clear(el.recentSeriesRow);
+    TinyPPILibraryLoading.clear(el.unseenSeriesGrid);
+    TinyPPILibraryLoading.clear(el.seriesGrid);
     seriesRead = false;
     seriesNextTry = Date.now() + FILMS_RETRY_MS;
     /* 403: no series on offer -- switched off in the add-on's settings, or a
@@ -275,6 +286,7 @@ function applySeriesSearch() {
 async function openShowView(show, from) {
   if (episodesBusy || startingEpisode) return;
   episodesBusy = true;
+  waitingForDetails(1);
   try {
     const answer = await TinyPPI.getJSON(
       "/api/episodes?tvshowid=" + encodeURIComponent(show.id));
@@ -294,6 +306,7 @@ async function openShowView(show, from) {
     seriesRead = false;
     TinyPPI.toast(T.series_failed, true);
   } finally {
+    waitingForDetails(-1);
     episodesBusy = false;
   }
   readEpisodesPutOff();

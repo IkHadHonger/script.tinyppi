@@ -11,7 +11,7 @@
    What it uses from them and what it gives them is listed below. */
 
 /* global openShowDetails, selectTab, bindTitle, el, episodeCode, FILMS_RETRY_MS, FILMS_START_MS, filmsStale,
-   metaLine, ratingBadge, seriesStale, T */
+   metaLine, ratingBadge, seriesStale, T, TinyPPILibraryLoading */
 /* exported continueStale, hideContinue, releaseContinue, requestContinue,
    resumeReleasing, resuming */
 
@@ -51,6 +51,11 @@ function requestContinue(force) {
   if (!force && continueRead) return;
   if (Date.now() < continueNextTry) return;
   continueBusy = true;
+  if (!continueShown) {
+    TinyPPILibraryLoading.showCard(el.continueFilmsCard, el.continueFilmsRow, 5);
+    TinyPPILibraryLoading.showCard(el.continueSeriesCard, el.continueSeriesRow, 5);
+    TinyPPILibraryLoading.showCard(el.nextSeriesCard, el.nextSeriesRow, 5);
+  }
   loadContinue().finally(() => { continueBusy = false; });
 }
 
@@ -67,6 +72,9 @@ async function loadContinue() {
     }
     continueShown = true;
     continueNextTry = 0;
+    TinyPPILibraryLoading.clear(el.continueFilmsRow);
+    TinyPPILibraryLoading.clear(el.continueSeriesRow);
+    TinyPPILibraryLoading.clear(el.nextSeriesRow);
     const list = Array.isArray(answer.items) ? answer.items : [];
     /* An add-on older than the next-up row sends none, and the row is no card. */
     const next = Array.isArray(answer.next) ? answer.next : [];
@@ -81,6 +89,9 @@ async function loadContinue() {
     el.continueSeriesCard.classList.toggle("hidden", continueEpisodes === 0);
     el.nextSeriesCard.classList.toggle("hidden", nextEpisodes === 0);
   } catch (error) {
+    TinyPPILibraryLoading.clear(el.continueFilmsRow);
+    TinyPPILibraryLoading.clear(el.continueSeriesRow);
+    TinyPPILibraryLoading.clear(el.nextSeriesRow);
     continueRead = false;
     continueNextTry = Date.now() + FILMS_RETRY_MS;
     /* 403: neither shelf on offer.  404: an add-on older than the row. */
