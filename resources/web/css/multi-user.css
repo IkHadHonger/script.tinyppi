@@ -17,18 +17,28 @@
   .user-dashboards > .user-dashboard:not(.box-idle),
   .user-dashboards.single-user > .user-dashboard:not(.box-idle) { flex: none; width: 100%; }
 }
-.tinyppi-embedded .topbar {
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-}
+.tinyppi-embedded .topbar { display: flex; padding: 8px 12px; }
 .tinyppi-embedded .brand { display: none; }
 .tinyppi-embedded .tabbar {
   position: static !important; transform: none; inset: auto !important;
-  display: flex !important; flex: none; justify-content: center;
-  width: fit-content; margin: 0 0 0 auto; padding: 4px;
+  display: flex !important; justify-content: center;
+  width: min(700px, calc(100% - 24px)); min-height: 64px;
+  margin: 8px auto 14px; padding: 6px;
 }
-.tinyppi-embedded .tabbar .tab { min-width: 48px; min-height: 44px; padding: 5px 8px; }
-.tinyppi-embedded .tabbar .setbtn { min-height: 44px; margin: 0; }
+.tinyppi-embedded .tabbar .tab { padding: 0 3px; }
+.tinyppi-embedded .tabbar .tabicon { height: 50px; border-radius: 13px; }
+.tinyppi-embedded .tabbar .tabicon .ui-icon { width: 22px; height: 22px; }
+.tinyppi-embedded .tabbar .tablabel { font-size: 11px; }
 .tinyppi-embedded .tabbar .tab:not([data-tab="live"]):not([data-tab="metadata"]) { display: none !important; }
+@media (max-width: 620px) {
+  .tinyppi-embedded .tabbar {
+    width: calc(100% - 24px); min-height: 50px; padding: 2px 5px;
+  }
+  .tinyppi-embedded .tabbar .tab { padding: 0; }
+  .tinyppi-embedded .tabbar .tabicon { height: 46px; border-radius: 12px; }
+  .tinyppi-embedded .tabbar .tabicon .ui-icon { width: 18px; height: 18px; }
+  .tinyppi-embedded .tabbar .tablabel { font-size: 9px; }
+}
 .tinyppi-embedded main { padding: 8px !important; margin: 0 !important; max-width: none; }
 .tinyppi-embedded body { min-height: 0 !important; height: auto !important; display: block !important; }
 .tinyppi-embedded main, .tinyppi-embedded .tabpanel { flex: none !important; min-height: 0 !important; }
