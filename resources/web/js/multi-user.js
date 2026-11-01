@@ -170,7 +170,10 @@
     const now = Date.now();
     const active = boxes.filter((box) => activeBox(box, now));
     for (const box of boxes) {
-      const visible = active.includes(box) || box.authorizing || box.needsToken || box.tokenDialogOpen;
+      /* A configured box without a valid token is managed from Settings; it
+         must not leave an empty player and its private navigation in Live.
+         Keep it visible only while its token dialog is deliberately opened. */
+      const visible = active.includes(box) || box.authorizing || box.tokenDialogOpen;
       box.frame.classList.toggle('box-idle', !visible);
       box.frame.inert = !visible;
       box.frame.setAttribute('aria-hidden', String(!visible));
