@@ -24,6 +24,33 @@ struct DashboardWebView: UIViewRepresentable {
             name: Coordinator.detailVisibilityMessage
         )
 
+        let appShellScript = """
+        (() => {
+          if (window.top !== window) return;
+          const install = () => {
+            const root = document.documentElement;
+            if (!root) return false;
+            root.classList.add('tinyppi-ios-app');
+            if (!document.getElementById('tinyppi-ios-app-shell')) {
+              const style = document.createElement('style');
+              style.id = 'tinyppi-ios-app-shell';
+              style.textContent = '#tabBar { display: none !important; }';
+              root.appendChild(style);
+            }
+            return true;
+          };
+          if (!install()) {
+            const observer = new MutationObserver(() => {
+              if (install()) observer.disconnect();
+            });
+            observer.observe(document, {childList: true, subtree: true});
+          }
+        })();
+        """
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: appShellScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        )
+
         let quotedToken = (try? String(data: JSONEncoder().encode(token), encoding: .utf8)) ?? "\"\""
         let tokenScript = "localStorage.setItem('tinyppi.token', \(quotedToken));"
         configuration.userContentController.addUserScript(
@@ -55,7 +82,6 @@ struct DashboardWebView: UIViewRepresentable {
           document.documentElement.classList.add('tinyppi-ios-app');
           const style = document.createElement('style');
           style.textContent = `
-            .tinyppi-ios-app #tabBar { display: none !important; }
             .tinyppi-ios-app #dashboardBoxesCard .sethead { font-size: 19px; padding-top: 18px; }
             .tinyppi-ios-app #dashboardBoxesCard .setbody { gap: 14px; }
             .tinyppi-ios-app #dashboardBoxesCard label { color: var(--muted); line-height: 1.4; }
