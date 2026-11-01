@@ -25,6 +25,10 @@ struct DashboardWebView: UIViewRepresentable {
             context.coordinator,
             name: Coordinator.detailVisibilityMessage
         )
+        configuration.userContentController.add(
+            context.coordinator,
+            name: Coordinator.tabBarVisibilityMessage
+        )
 
         let appShellScript = """
         (() => {
@@ -181,6 +185,27 @@ struct DashboardWebView: UIViewRepresentable {
         configuration.userContentController.addUserScript(
             WKUserScript(source: detailVisibilityScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
+        let tabBarVisibilityScript = """
+        (() => {
+          if (window.top !== window || window.__tinyppiNativeTabBarObserver) return;
+          window.__tinyppiNativeTabBarObserver = true;
+          let last = null;
+          const report = () => {
+            const hidden = document.documentElement.classList.contains('bar-away');
+            if (hidden === last) return;
+            last = hidden;
+            window.webkit?.messageHandlers?.tinyppiTabBarVisibility?.postMessage(hidden);
+          };
+          new MutationObserver(report).observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+          });
+          report();
+        })();
+        """
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: tabBarVisibilityScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
@@ -189,11 +214,11 @@ struct DashboardWebView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .black
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.scrollView.delegate = context.coordinator
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
+        let tabChanged = context.coordinator.selectedTab != selectedTab
         context.coordinator.selectedTab = selectedTab
         context.coordinator.onDetailVisibilityChanged = onDetailVisibilityChanged
         context.coordinator.onTabBarVisibilityChanged = onTabBarVisibilityChanged
@@ -202,7 +227,7 @@ struct DashboardWebView: UIViewRepresentable {
             || webView.url?.port != baseURL.port {
             context.coordinator.hasRequestedInitialLoad = true
             load(webView)
-        } else if webView.url != nil {
+        } else if tabChanged, webView.url != nil {
             context.coordinator.selectTab(in: webView)
         }
     }
@@ -216,15 +241,14 @@ struct DashboardWebView: UIViewRepresentable {
         webView.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 15))
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         static let detailVisibilityMessage = "tinyppiDetailVisibility"
+        static let tabBarVisibilityMessage = "tinyppiTabBarVisibility"
         var selectedTab: String
         var onDetailVisibilityChanged: (Bool) -> Void
         var onTabBarVisibilityChanged: (Bool) -> Void
         var hasRequestedInitialLoad = false
         private var detailIsOpen = false
-        private var tabBarIsHidden = false
-        private var lastScrollY: CGFloat = 0
 
         init(
             selectedTab: String,
@@ -240,35 +264,18 @@ struct DashboardWebView: UIViewRepresentable {
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard message.name == Self.detailVisibilityMessage,
-                  let isOpen = message.body as? Bool,
-                  isOpen != detailIsOpen else { return }
-            detailIsOpen = isOpen
-            onDetailVisibilityChanged(isOpen)
-        }
-
-        func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            let y = max(0, scrollView.contentOffset.y)
-            let delta = y - lastScrollY
-            lastScrollY = y
-            guard !detailIsOpen else { return }
-            let isAtBottom = y + scrollView.bounds.height >= scrollView.contentSize.height - 2
-            if isAtBottom || delta < -0.5 {
-                setTabBarHidden(false)
-            } else if delta > 0.5 {
-                setTabBarHidden(true)
+            if message.name == Self.detailVisibilityMessage,
+               let isOpen = message.body as? Bool,
+               isOpen != detailIsOpen {
+                detailIsOpen = isOpen
+                onDetailVisibilityChanged(isOpen)
+            } else if message.name == Self.tabBarVisibilityMessage,
+                      let isHidden = message.body as? Bool {
+                onTabBarVisibilityChanged(isHidden)
             }
         }
 
-        private func setTabBarHidden(_ hidden: Bool) {
-            guard hidden != tabBarIsHidden else { return }
-            tabBarIsHidden = hidden
-            onTabBarVisibilityChanged(hidden)
-        }
-
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            lastScrollY = max(0, webView.scrollView.contentOffset.y)
-            setTabBarHidden(false)
             selectTab(in: webView)
         }
 

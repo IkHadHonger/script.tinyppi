@@ -19,20 +19,17 @@ struct RootView: View {
                 )
                     .id(url.absoluteString + "|" + model.configuration.token)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if !detailIsOpen && !tabBarIsHidden {
-                            DashboardTabBar(selection: $selectedTab) {
-                                showServerSettings = true
-                            }
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .ignoresSafeArea(.container, edges: .bottom)
+                    .overlay(alignment: .bottom) {
+                        DashboardTabBar(selection: $selectedTab) {
+                            showServerSettings = true
                         }
+                        .offset(y: detailIsOpen || tabBarIsHidden ? 110 : 0)
+                        .opacity(detailIsOpen || tabBarIsHidden ? 0 : 1)
+                        .allowsHitTesting(!detailIsOpen && !tabBarIsHidden)
                     }
                     .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.52), value: detailIsOpen)
                     .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.52), value: tabBarIsHidden)
-                    .ignoresSafeArea(
-                        .container,
-                        edges: detailIsOpen || tabBarIsHidden ? .bottom : Edge.Set()
-                    )
             } else {
                 NavigationStack { SettingsView() }
             }
