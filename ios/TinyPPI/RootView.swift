@@ -24,8 +24,7 @@ struct RootView: View {
                         DashboardTabBar(selection: $selectedTab) {
                             showServerSettings = true
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 4)
+                        .padding(.horizontal, 18)
                         .offset(y: detailIsOpen || tabBarIsHidden ? 110 : 0)
                         .opacity(detailIsOpen || tabBarIsHidden ? 0 : 1)
                         .allowsHitTesting(!detailIsOpen && !tabBarIsHidden)
@@ -100,15 +99,15 @@ private struct DashboardTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.icon)
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 24, height: 20, alignment: .center)
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 22, height: 19, alignment: .center)
                         Text(tab.title)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 8.5, weight: .medium))
                             .lineLimit(1)
-                            .frame(height: 11, alignment: .center)
+                            .frame(height: 10, alignment: .center)
                     }
                     .foregroundStyle(selection == tab ? Color.orange : Color.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 50, maxHeight: 50, alignment: .center)
+                    .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46, alignment: .center)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -116,14 +115,14 @@ private struct DashboardTabBar: View {
             }
         }
         .padding(.horizontal, 5)
-        .padding(.vertical, 3)
+        .padding(.vertical, 2)
         .background(Color(red: 0.105, green: 0.125, blue: 0.14))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.white.opacity(0.09), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.28), radius: 9, y: 3)
     }
 }
 

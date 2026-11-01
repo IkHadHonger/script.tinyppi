@@ -10,7 +10,7 @@ struct SettingsView: View {
             VStack(spacing: 24) {
                 serverCard
                 settingsSections
-                Text("TinyPPI iOS 1.6.3  •  Backend 2.22.8")
+                Text("TinyPPI iOS 1.6.4  •  Backend 2.22.8")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -358,7 +358,7 @@ private struct AboutTinyPPIView: View {
         List {
             Section {
                 LabeledContent("App", value: "TinyPPI iOS")
-                LabeledContent("Versie", value: "1.6.3")
+                LabeledContent("Versie", value: "1.6.4")
                 LabeledContent("Ondersteunde backend", value: "TinyPPI 2.22.0")
             }
         }
