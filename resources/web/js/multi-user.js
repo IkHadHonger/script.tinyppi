@@ -71,6 +71,26 @@
       if (target && event.source === parent && event.origin === target &&
           event.data?.type === 'tinyppi-ask-token') TinyPPI.askToken();
     });
+    /* A horizontal gesture starts inside this iframe, so the outer carousel
+       does not reliably receive it (especially after its first snap in
+       WebKit).  Report a completed, predominantly horizontal swipe to the
+       parent and let the parent move the user carousel. */
+    let swipeStart = null;
+    document.addEventListener('touchstart', (event) => {
+      if (event.touches.length !== 1) { swipeStart = null; return; }
+      const touch = event.touches[0];
+      swipeStart = {x: touch.clientX, y: touch.clientY};
+    }, {passive: true});
+    document.addEventListener('touchend', (event) => {
+      if (!swipeStart || event.changedTouches.length !== 1) { swipeStart = null; return; }
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - swipeStart.x;
+      const dy = touch.clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(dx) < 52 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      if (target) parent.postMessage({type: 'tinyppi-user-swipe', direction: dx < 0 ? 1 : -1}, target);
+    }, {passive: true});
+    document.addEventListener('touchcancel', () => { swipeStart = null; }, {passive: true});
     function report() {
       user = document.querySelector('.jellyfin-user')?.textContent || user;
       userHeading.textContent = user || (TinyPPI.relayOrigin ? TinyPPI.relayOrigin + ' · via deze Cube' : location.host);
@@ -224,10 +244,21 @@
     describe();
   }
   addEventListener('message', (event) => {
-    if (!event.data || event.data.type !== 'tinyppi-box') return;
+    if (!event.data) return;
     const box = boxes.find((item) => item.transportOrigin === event.origin &&
       item.frame.contentWindow === event.source);
     if (!box) return;
+    if (event.data.type === 'tinyppi-user-swipe') {
+      const active = boxes.filter((item) => activeBox(item, Date.now()));
+      const current = active.indexOf(box);
+      const direction = event.data.direction === -1 ? -1 : 1;
+      const next = current < 0 ? -1 : Math.max(0, Math.min(active.length - 1, current + direction));
+      if (next >= 0 && next !== current) {
+        row.scrollTo({left: active[next].frame.offsetLeft - row.offsetLeft, behavior: 'smooth'});
+      }
+      return;
+    }
+    if (event.data.type !== 'tinyppi-box') return;
     box.updated = Date.now();
     box.playing = event.data.playing;
     box.connected = event.data.connected;

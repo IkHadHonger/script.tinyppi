@@ -4,7 +4,7 @@
 .tinyppi-multi .user-dashboards-summary { display: block; color: var(--muted); overflow-wrap: anywhere; }
 .tinyppi-multi .user-dashboards {
   display: flex; align-items: flex-start; gap: 18px; overflow-x: auto;
-  scroll-snap-type: x proximity; padding-bottom: 18px;
+  scroll-snap-type: x mandatory; scroll-behavior: smooth; padding-bottom: 18px;
 }
 .user-dashboard {
   flex: 0 0 min(560px, 100%); width: min(560px, 100%); height: 1000px;
