@@ -93,4 +93,12 @@ jobs:
       - name: Check
         working-directory: ${{ runner.temp }}/addons
         run: python "$GITHUB_WORKSPACE/tools/check_addon.py" --branch omega --skip-dependency-checks script.tinyppi
+      - name: Package installable add-on
+        working-directory: ${{ runner.temp }}/addons
+        run: zip -r "$RUNNER_TEMP/script.tinyppi-2.22.1.zip" script.tinyppi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TinyPPI-2.22.1-Kodi
+          path: ${{ runner.temp }}/script.tinyppi-2.22.1.zip
+          if-no-files-found: error
 
