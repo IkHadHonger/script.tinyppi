@@ -6,13 +6,23 @@ struct DashboardWebView: UIViewRepresentable {
     let baseURL: URL
     let token: String
     let selectedTab: String
+    var onDetailVisibilityChanged: (Bool) -> Void = { _ in }
 
-    func makeCoordinator() -> Coordinator { Coordinator(selectedTab: selectedTab) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            selectedTab: selectedTab,
+            onDetailVisibilityChanged: onDetailVisibilityChanged
+        )
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.allowsInlineMediaPlayback = true
+        configuration.userContentController.add(
+            context.coordinator,
+            name: Coordinator.detailVisibilityMessage
+        )
 
         let quotedToken = (try? String(data: JSONEncoder().encode(token), encoding: .utf8)) ?? "\"\""
         let tokenScript = "localStorage.setItem('tinyppi.token', \(quotedToken));"
@@ -107,6 +117,33 @@ struct DashboardWebView: UIViewRepresentable {
         configuration.userContentController.addUserScript(
             WKUserScript(source: settingsPolishScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
+        let detailVisibilityScript = """
+        (() => {
+          if (window.top !== window || window.__tinyppiNativeDetailObserver) return;
+          window.__tinyppiNativeDetailObserver = true;
+          let last = null;
+          const report = () => {
+            const open = ['detailsDialog', 'seasonsDialog'].some((id) =>
+              document.getElementById(id)?.hasAttribute('open'));
+            if (open === last) return;
+            last = open;
+            window.webkit?.messageHandlers?.tinyppiDetailVisibility?.postMessage(open);
+          };
+          const observe = () => {
+            for (const id of ['detailsDialog', 'seasonsDialog']) {
+              const dialog = document.getElementById(id);
+              if (dialog) new MutationObserver(report).observe(dialog, {attributes: true, attributeFilter: ['open']});
+            }
+            report();
+          };
+          document.readyState === 'loading'
+            ? document.addEventListener('DOMContentLoaded', observe, {once: true})
+            : observe();
+        })();
+        """
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: detailVisibilityScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        )
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
@@ -121,6 +158,7 @@ struct DashboardWebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.selectedTab = selectedTab
+        context.coordinator.onDetailVisibilityChanged = onDetailVisibilityChanged
         if webView.url?.host != baseURL.host || webView.url?.port != baseURL.port {
             load(webView)
         } else {
@@ -137,11 +175,26 @@ struct DashboardWebView: UIViewRepresentable {
         webView.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 15))
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+        static let detailVisibilityMessage = "tinyppiDetailVisibility"
         var selectedTab: String
+        var onDetailVisibilityChanged: (Bool) -> Void
+        private var detailIsOpen = false
 
-        init(selectedTab: String) {
+        init(selectedTab: String, onDetailVisibilityChanged: @escaping (Bool) -> Void) {
             self.selectedTab = selectedTab
+            self.onDetailVisibilityChanged = onDetailVisibilityChanged
+        }
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == Self.detailVisibilityMessage,
+                  let isOpen = message.body as? Bool,
+                  isOpen != detailIsOpen else { return }
+            detailIsOpen = isOpen
+            onDetailVisibilityChanged(isOpen)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

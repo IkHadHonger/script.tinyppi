@@ -4,18 +4,28 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showServerSettings = false
     @State private var selectedTab = DashboardTab.live
+    @State private var detailIsOpen = false
 
     var body: some View {
         Group {
             if model.hello != nil, let url = model.configuration.baseURL {
-                DashboardWebView(baseURL: url, token: model.configuration.token, selectedTab: selectedTab.rawValue)
+                DashboardWebView(
+                    baseURL: url,
+                    token: model.configuration.token,
+                    selectedTab: selectedTab.rawValue,
+                    onDetailVisibilityChanged: { detailIsOpen = $0 }
+                )
                     .id(url.absoluteString + "|" + model.configuration.token)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        DashboardTabBar(selection: $selectedTab) {
-                            showServerSettings = true
+                        if !detailIsOpen {
+                            DashboardTabBar(selection: $selectedTab) {
+                                showServerSettings = true
+                            }
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
+                    .animation(.easeInOut(duration: 0.2), value: detailIsOpen)
             } else {
                 NavigationStack { SettingsView() }
             }
