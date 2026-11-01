@@ -146,7 +146,8 @@ function hold(view, path) {
 
 const tiles = (view, id) => [...view.$(id).children];
 const titles = (view, id) => tiles(view, id)
-  .map((node) => node.querySelector(".filmtitle").textContent);
+  .map((node) => node.querySelector(".filmtitle")?.textContent)
+  .filter(Boolean);
 const shown = (view, id) => tiles(view, id).filter((node) => !node.hidden)
   .map((node) => node.querySelector(".filmtitle").textContent);
 const hidden = (view, id) => view.$(id).classList.contains("hidden");

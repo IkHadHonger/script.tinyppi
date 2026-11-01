@@ -132,7 +132,8 @@ function hold(view, path) {
 const ROWS = ["continueFilmsRow", "continueSeriesRow"];
 const tiles = (view, id) => [...view.$(id).children];
 const titles = (view, id) => tiles(view, id)
-  .map((node) => node.querySelector(".filmtitle").textContent);
+  .map((node) => node.querySelector(".filmtitle")?.textContent)
+  .filter(Boolean);
 const hidden = (view, id) => view.$(id).classList.contains("hidden");
 const everyTile = (view) => ROWS.flatMap((id) => tiles(view, id));
 

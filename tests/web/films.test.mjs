@@ -127,15 +127,17 @@ function hold(view, path) {
 /** The tiles in the row or wall *id*. */
 const tiles = (view, id) => [...view.$(id).children];
 const titles = (view, id) => tiles(view, id)
-  .map((node) => node.querySelector(".filmtitle").textContent);
+  .map((node) => node.querySelector(".filmtitle")?.textContent)
+  .filter(Boolean);
 const shown = (view, id) => tiles(view, id).filter((node) => !node.hidden)
-  .map((node) => node.querySelector(".filmtitle").textContent);
+  .map((node) => node.querySelector(".filmtitle")?.textContent)
+  .filter(Boolean);
 const hidden = (view, id) => view.$(id).classList.contains("hidden");
 
 /** The wall's tile for the film called *title*. */
 function tile(view, title, id = "filmGrid") {
   const found = tiles(view, id)
-    .find((node) => node.querySelector(".filmtitle").textContent === title);
+    .find((node) => node.querySelector(".filmtitle")?.textContent === title);
   assert.ok(found, title);
   return found;
 }
