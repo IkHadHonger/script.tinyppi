@@ -7,11 +7,13 @@ struct DashboardWebView: UIViewRepresentable {
     let token: String
     let selectedTab: String
     var onDetailVisibilityChanged: (Bool) -> Void = { _ in }
+    var onTabBarVisibilityChanged: (Bool) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             selectedTab: selectedTab,
-            onDetailVisibilityChanged: onDetailVisibilityChanged
+            onDetailVisibilityChanged: onDetailVisibilityChanged,
+            onTabBarVisibilityChanged: onTabBarVisibilityChanged
         )
     }
 
@@ -187,12 +189,14 @@ struct DashboardWebView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .black
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.delegate = context.coordinator
         return webView
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.selectedTab = selectedTab
         context.coordinator.onDetailVisibilityChanged = onDetailVisibilityChanged
+        context.coordinator.onTabBarVisibilityChanged = onTabBarVisibilityChanged
         if !context.coordinator.hasRequestedInitialLoad
             || webView.url?.host != baseURL.host
             || webView.url?.port != baseURL.port {
@@ -212,16 +216,24 @@ struct DashboardWebView: UIViewRepresentable {
         webView.load(URLRequest(url: url, cachePolicy: .reloadRevalidatingCacheData, timeoutInterval: 15))
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         static let detailVisibilityMessage = "tinyppiDetailVisibility"
         var selectedTab: String
         var onDetailVisibilityChanged: (Bool) -> Void
+        var onTabBarVisibilityChanged: (Bool) -> Void
         var hasRequestedInitialLoad = false
         private var detailIsOpen = false
+        private var tabBarIsHidden = false
+        private var lastScrollY: CGFloat = 0
 
-        init(selectedTab: String, onDetailVisibilityChanged: @escaping (Bool) -> Void) {
+        init(
+            selectedTab: String,
+            onDetailVisibilityChanged: @escaping (Bool) -> Void,
+            onTabBarVisibilityChanged: @escaping (Bool) -> Void
+        ) {
             self.selectedTab = selectedTab
             self.onDetailVisibilityChanged = onDetailVisibilityChanged
+            self.onTabBarVisibilityChanged = onTabBarVisibilityChanged
         }
 
         func userContentController(
@@ -235,7 +247,28 @@ struct DashboardWebView: UIViewRepresentable {
             onDetailVisibilityChanged(isOpen)
         }
 
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            let y = max(0, scrollView.contentOffset.y)
+            let delta = y - lastScrollY
+            lastScrollY = y
+            guard !detailIsOpen else { return }
+            let isAtBottom = y + scrollView.bounds.height >= scrollView.contentSize.height - 2
+            if isAtBottom || delta < -2 {
+                setTabBarHidden(false)
+            } else if delta > 0.5 {
+                setTabBarHidden(true)
+            }
+        }
+
+        private func setTabBarHidden(_ hidden: Bool) {
+            guard hidden != tabBarIsHidden else { return }
+            tabBarIsHidden = hidden
+            onTabBarVisibilityChanged(hidden)
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            lastScrollY = max(0, webView.scrollView.contentOffset.y)
+            setTabBarHidden(false)
             selectTab(in: webView)
         }
 

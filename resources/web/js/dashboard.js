@@ -299,13 +299,11 @@ window.addEventListener("hashchange", () => {
 
 /* --- the bar's comings and goings -------------------------------------- */
 
-/* The bar follows the reader rather than a timer: a deliberate downward
-   journey buys more room, a small upward move calls navigation straight
+/* The bar follows the reader rather than a timer: the first downward
+   movement buys more room, a small upward move calls navigation straight
    back, and the end of the page never leaves somebody stranded without it.
    Details own the whole screen and therefore keep it away. */
-const BAR_HIDE_DISTANCE = 96;
 let lastBarScrollY = Math.max(0, window.scrollY);
-let barDownDistance = 0;
 let barLeftAt = 0;         /* ignore the layout scroll caused by leaving    */
 
 function detailsAreOpen() {
@@ -315,14 +313,12 @@ function detailsAreOpen() {
 function wakeBar() {
   if (detailsAreOpen()) return;
   document.documentElement.classList.remove("bar-away");
-  barDownDistance = 0;
 }
 
 function hideBar() {
   if (el.tabBar.matches(":hover, :focus-within")) return;
   document.documentElement.classList.add("bar-away");
   barLeftAt = Date.now();
-  barDownDistance = 0;
 }
 
 document.addEventListener("keydown", wakeBar, { capture: true, passive: true });
@@ -349,8 +345,7 @@ window.addEventListener("scroll", () => {
   if (atPageEnd() || moved < -3) {
     wakeBar();
   } else if (moved > 0 && Date.now() - barLeftAt > 600) {
-    barDownDistance += moved;
-    if (barDownDistance >= BAR_HIDE_DISTANCE) hideBar();
+    hideBar();
   }
 }, { passive: true });
 

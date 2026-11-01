@@ -5,6 +5,7 @@ struct RootView: View {
     @State private var showServerSettings = false
     @State private var selectedTab = DashboardTab.live
     @State private var detailIsOpen = false
+    @State private var tabBarIsHidden = false
 
     var body: some View {
         Group {
@@ -13,22 +14,24 @@ struct RootView: View {
                     baseURL: url,
                     token: model.configuration.token,
                     selectedTab: selectedTab.rawValue,
-                    onDetailVisibilityChanged: { detailIsOpen = $0 }
+                    onDetailVisibilityChanged: { detailIsOpen = $0 },
+                    onTabBarVisibilityChanged: { tabBarIsHidden = $0 }
                 )
                     .id(url.absoluteString + "|" + model.configuration.token)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if !detailIsOpen {
+                        if !detailIsOpen && !tabBarIsHidden {
                             DashboardTabBar(selection: $selectedTab) {
                                 showServerSettings = true
                             }
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
-                    .animation(.easeInOut(duration: 0.2), value: detailIsOpen)
+                    .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.52), value: detailIsOpen)
+                    .animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.52), value: tabBarIsHidden)
                     .ignoresSafeArea(
                         .container,
-                        edges: detailIsOpen ? .bottom : Edge.Set()
+                        edges: detailIsOpen || tabBarIsHidden ? .bottom : Edge.Set()
                     )
             } else {
                 NavigationStack { SettingsView() }

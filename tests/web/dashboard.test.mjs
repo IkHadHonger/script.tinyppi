@@ -347,7 +347,7 @@ test("a browser that blocks storage and address writes still switches tabs", (t)
 
 /* --- the bar's comings and goings ------------------------------------- */
 
-test("the bar stays while idle, hides after a deliberate downward scroll and returns upward", (t) => {
+test("the bar stays while idle, hides on the first downward scroll and returns upward", (t) => {
   const { window, clock } = open(t);
   const away = () => window.document.documentElement.classList.contains("bar-away");
   Object.defineProperty(window, "scrollY", { configurable: true, writable: true, value: 0 });
@@ -359,13 +359,9 @@ test("the bar stays while idle, hides after a deliberate downward scroll and ret
   };
   clock.tick(9000);
   assert.equal(away(), false, "time alone does not hide navigation");
-  scroll(50);
-  assert.equal(away(), false, "a small downward move is ignored");
-  scroll(95);
-  assert.equal(away(), false, "the threshold has not been crossed");
-  scroll(100);
-  assert.equal(away(), true);
-  scroll(95);
+  scroll(1);
+  assert.equal(away(), true, "the first downward move hides navigation");
+  scroll(0);
   assert.equal(away(), false, "a small upward move restores navigation");
 });
 
