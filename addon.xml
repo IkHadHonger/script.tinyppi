@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="script.tinyppi" name="TinyPPI" version="2.22.4" provider-name="jamal2362, IkHadHonger">
+<addon id="script.tinyppi" name="TinyPPI" version="2.22.5" provider-name="jamal2362, IkHadHonger">
     <requires>
         <import addon="xbmc.python" version="3.0.0" />
         <import addon="script.module.sidedata" version="1.6.0" />
@@ -23,7 +23,10 @@
         <description lang="hu">Megnyit egy külön folyamatinformációs ablakot. Ez az ablak az aktuálisan lejátszott média kodek-, videó- és hangadatait jeleníti meg.</description>
         <description lang="zh">打开一个独立的进程信息窗口。此窗口显示当前播放媒体的编解码器、视频和音频详细信息。</description>
 
-        <news>v2.22.4 (Jellyfin fork)
+        <news>v2.22.5 (Jellyfin fork)
+- Makes the web navigation dock glide smoothly in and out while scrolling.
+
+v2.22.4 (Jellyfin fork)
 - Hide navigation after a deliberate downward scroll and restore it on upward scroll.
 - Keep navigation available at the end of a page, on keyboard focus and at the desktop bottom edge.
 - Hide navigation while film and series detail pages own the screen.</news>

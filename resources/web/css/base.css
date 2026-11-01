@@ -419,7 +419,7 @@ main {
    comes back with the bar (see the bar's comings and goings in
    js/dashboard.js). */
 :root.bar-away { --tabbar-room: 12px; }
-main { transition: padding-bottom .3s ease; }
+main { transition: padding-bottom .52s cubic-bezier(.22, 1, .36, 1); }
 
 /* Live, metadata, history and settings stand in the middle of the room
    between the top bar and the tab bar rather than hanging from the top of it;
@@ -480,7 +480,10 @@ main { transition: padding-bottom .3s ease; }
   backdrop-filter: blur(18px) saturate(1.3);
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
   box-shadow: var(--shadow-lift);
-  transition: transform .3s ease, opacity .3s ease;
+  will-change: transform, opacity;
+  transition:
+    transform .52s cubic-bezier(.22, 1, .36, 1),
+    opacity .36s ease-out;
 }
 /* Away: slid off the foot of the screen and faded, and nothing to press. */
 :root.bar-away .tabbar {
