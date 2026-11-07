@@ -212,7 +212,10 @@ struct DashboardWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
-        webView.allowsBackForwardNavigationGestures = true
+        // The dashboard uses horizontal swipes to move between active users.
+        // WKWebView's browser-style back/forward recognizer otherwise claims
+        // the same gesture before the embedded user carousel receives it.
+        webView.allowsBackForwardNavigationGestures = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         return webView
     }
